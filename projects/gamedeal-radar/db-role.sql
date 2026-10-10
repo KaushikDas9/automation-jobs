@@ -22,6 +22,10 @@
 --                            INSERT, UPDATE (upsert of the current price)
 --   price_events             INSERT   (NEW_DEAL / PRICE_DROP / DEAL_ENDED)
 --
+-- Resilience revision: the resume and coverage queries read games and
+-- game_store_mappings (both already granted above). Marking a game as checked uses
+-- the existing UPDATE on last_checked_at and updated_at. No new grants are needed.
+--
 -- Deliberately NOT granted: DELETE, TRUNCATE, DDL, access to job_records,
 -- content_records, publishing_records, source_references, or any other table,
 -- and no superuser or CREATEDB/CREATEROLE rights.

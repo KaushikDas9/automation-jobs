@@ -16,13 +16,6 @@ import (
 	"gamedeal-radar/daily-check/internal/pricing"
 )
 
-// Game is an active catalog title plus its Steam app id (empty when unmapped).
-type Game struct {
-	ID            string
-	Slug          string
-	ExternalAppID string
-}
-
 // Connect opens a single connection. Any error text is scrubbed of the DSN and its
 // password so the secret can never reach logs or the GitHub Actions log.
 func Connect(ctx context.Context, dsn string) (*pgx.Conn, error) {
@@ -58,42 +51,6 @@ func SteamStoreID(ctx context.Context, conn *pgx.Conn) (string, error) {
 		return "", fmt.Errorf("fetching steam store id: %w", err)
 	}
 	return id, nil
-}
-
-// ListActiveSteamGames returns active games, highest priority first, with one Steam
-// app id per game (any mapping, as the server's resolver does). limit <= 0 means no limit.
-func ListActiveSteamGames(ctx context.Context, conn *pgx.Conn, steamStoreID string, limit int) ([]Game, error) {
-	const q = `
-		SELECT g.id::text, g.slug, COALESCE(m.external_app_id, '')
-		FROM games g
-		LEFT JOIN LATERAL (
-			SELECT external_app_id
-			FROM game_store_mappings
-			WHERE game_id = g.id AND store_id = $1
-			LIMIT 1
-		) m ON true
-		WHERE g.is_active = true
-		ORDER BY g.priority DESC, g.name ASC
-		LIMIT NULLIF($2::int, 0);`
-
-	rows, err := conn.Query(ctx, q, steamStoreID, limit)
-	if err != nil {
-		return nil, fmt.Errorf("listing active games: %w", err)
-	}
-	defer rows.Close()
-
-	var out []Game
-	for rows.Next() {
-		var g Game
-		if err := rows.Scan(&g.ID, &g.Slug, &g.ExternalAppID); err != nil {
-			return nil, fmt.Errorf("scanning active game: %w", err)
-		}
-		out = append(out, g)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating active games: %w", err)
-	}
-	return out, nil
 }
 
 // PgStore implements pricing.Store on a pgx connection.

@@ -83,9 +83,10 @@ func NewClient(cfg Config) *Client {
 }
 
 // FetchPrice retrieves the price for appID in countryCode ("in" for India/INR).
-// It waits on the rate limiter before every attempt, retries network errors,
-// 429s and non-200 responses with exponential backoff plus jitter, and returns
-// ErrNotFound / ErrPriceUnavailable without retrying when Steam has no price.
+// It waits on the rate limiter before every attempt and retries transient failures
+// (network, 429, 5xx) with exponential backoff plus jitter. Permanent failures
+// (other 4xx, not found, price unavailable) return immediately. Errors are
+// classified by IsTransient.
 func (c *Client) FetchPrice(ctx context.Context, appID, countryCode string) (*PriceResult, error) {
 	if countryCode == "" {
 		countryCode = "in"
@@ -112,7 +113,7 @@ func (c *Client) FetchPrice(ctx context.Context, appID, countryCode string) (*Pr
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
 			}
-			lastErr = fmt.Errorf("executing http request for app %s: %w", appID, err)
+			lastErr = transient(fmt.Errorf("executing http request for app %s: %w", appID, err))
 			slog.Warn("steam request network error, retrying", "app_id", appID, "attempt", attempt)
 			if err := sleepCtx(ctx, c.backoff(attempt)); err != nil {
 				return nil, err
@@ -131,8 +132,12 @@ func (c *Client) FetchPrice(ctx context.Context, appID, countryCode string) (*Pr
 
 		if resp.StatusCode != http.StatusOK {
 			_ = resp.Body.Close()
-			lastErr = fmt.Errorf("steam api returned unexpected status %d", resp.StatusCode)
+			statusErr := &StatusError{Code: resp.StatusCode}
 			slog.Warn("steam api non-200 status", "app_id", appID, "status", resp.StatusCode)
+			if !IsTransient(statusErr) {
+				return nil, statusErr
+			}
+			lastErr = statusErr
 			if err := sleepCtx(ctx, c.backoff(attempt)); err != nil {
 				return nil, err
 			}
@@ -142,7 +147,7 @@ func (c *Client) FetchPrice(ctx context.Context, appID, countryCode string) (*Pr
 		body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 		_ = resp.Body.Close()
 		if err != nil {
-			return nil, fmt.Errorf("reading steam response body: %w", err)
+			return nil, transient(fmt.Errorf("reading steam response body: %w", err))
 		}
 
 		return ParseAppDetails(appID, countryCode, body, time.Now())

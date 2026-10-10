@@ -1,12 +1,20 @@
-// Command daily-check runs the GameDeal Radar daily Steam India price check.
+// Command daily-check runs one attempt of the GameDeal Radar Steam India price check.
 //
-// Configuration (environment):
+// Environment (all optional except GDR_DATABASE_URL):
 //
-//	GDR_DATABASE_URL  Postgres connection string (required, never logged)
-//	DRY_RUN           "1" or "true" to fetch prices without writing anything
-//	LIMIT             optional max number of games to process (testing)
+//	GDR_DATABASE_URL          Postgres connection string. Required. Never logged.
+//	DRY_RUN                   "1" or "true" fetches prices and writes nothing.
+//	LIMIT                     max games to fetch in this run (testing).
+//	SLOT_START                RFC3339 slot start override (testing). Disables the window check.
+//	ATTEMPT                   1..6 attempt override (testing and manual runs). Disables the window check.
+//	RETRY_WAIT_1, RETRY_WAIT_2  waits before retry passes, Go durations (default 5m, 10m; "0" for tests).
+//	GDR_HEALTHCHECK_URL       dead man's switch URL. Optional. Never logged.
+//	GDR_HEALTHCHECK_FINAL_URL pinged with /fail on the final attempt's failure. Optional.
+//	GITHUB_EVENT_NAME         set by Actions. "workflow_dispatch" marks a manual run.
+//	GITHUB_OUTPUT             set by Actions. Receives flags for the notification steps.
 //
-// Exit codes: 0 success, 1 run failed (DB unreachable, failure rate too high, cancelled),
+// Exit codes: 0 slot complete (coverage >= 90%), slot already complete, or outside the
+// slot window. 1 coverage below 90% after retries, or the database was unreachable.
 // 2 configuration error.
 package main
 
@@ -15,45 +23,55 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
-
-	"github.com/jackc/pgx/v5"
+	"time"
 
 	"gamedeal-radar/daily-check/internal/db"
-	"gamedeal-radar/daily-check/internal/pricing"
+	"gamedeal-radar/daily-check/internal/health"
+	"gamedeal-radar/daily-check/internal/run"
+	"gamedeal-radar/daily-check/internal/slot"
 	"gamedeal-radar/daily-check/internal/steam"
 )
 
-// maxFailureRate is the share of failed games above which the run exits non-zero.
-const maxFailureRate = 0.20
-
-// steamCountry is the storefront country code used by the server (India, INR).
-const steamCountry = "in"
+// runBudget matches the workflow's timeout-minutes. Retry waits stop early enough to leave
+// run.MinRemaining before this deadline.
+const runBudget = 45 * time.Minute
 
 type config struct {
-	dsn    string
-	dryRun bool
-	limit  int
+	dsn            string
+	dryRun         bool
+	manual         bool
+	limit          int
+	attempt        int
+	slotOverride   *time.Time
+	retryWait1     time.Duration
+	retryWait2     time.Duration
+	healthURL      string
+	finalHealthURL string
+	outputPath     string
 }
 
-// Summary is the per-run outcome printed at the end.
-type Summary struct {
-	Checked int
-	Updated int
-	Skipped int
-	Failed  int
+// status is what the run reports back to the workflow through GITHUB_OUTPUT.
+type status struct {
+	slotID          string
+	attempt         int
+	dryRun          bool
+	complete        bool
+	final           bool
+	alreadyComplete bool
+	coverage        float64
+	failed          int
+	total           int
 }
 
-// FailureRate is failed/checked, or 0 when nothing was checked.
-func (s Summary) FailureRate() float64 {
-	if s.Checked == 0 {
-		return 0
-	}
-	return float64(s.Failed) / float64(s.Checked)
+func main() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	os.Exit(runOnce())
 }
 
 func loadConfig() (config, error) {
@@ -66,6 +84,9 @@ func loadConfig() (config, error) {
 	case "1", "true", "yes":
 		c.dryRun = true
 	}
+	c.manual = os.Getenv("GITHUB_EVENT_NAME") == "workflow_dispatch"
+	c.outputPath = os.Getenv("GITHUB_OUTPUT")
+
 	if raw := strings.TrimSpace(os.Getenv("LIMIT")); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil || n < 0 {
@@ -73,112 +94,191 @@ func loadConfig() (config, error) {
 		}
 		c.limit = n
 	}
+	if raw := strings.TrimSpace(os.Getenv("SLOT_START")); raw != "" {
+		t, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			return c, fmt.Errorf("SLOT_START must be RFC3339, got %q", raw)
+		}
+		t = t.UTC()
+		c.slotOverride = &t
+	}
+	if raw := strings.TrimSpace(os.Getenv("ATTEMPT")); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 || n > slot.MaxAttempts {
+			return c, fmt.Errorf("ATTEMPT must be between 1 and %d, got %q", slot.MaxAttempts, raw)
+		}
+		c.attempt = n
+	}
+
+	var err error
+	if c.retryWait1, err = durationEnv("RETRY_WAIT_1", 5*time.Minute); err != nil {
+		return c, err
+	}
+	if c.retryWait2, err = durationEnv("RETRY_WAIT_2", 10*time.Minute); err != nil {
+		return c, err
+	}
+	if c.healthURL, err = httpURLEnv("GDR_HEALTHCHECK_URL"); err != nil {
+		return c, err
+	}
+	if c.finalHealthURL, err = httpURLEnv("GDR_HEALTHCHECK_FINAL_URL"); err != nil {
+		return c, err
+	}
 	return c, nil
 }
 
-func main() {
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
-	os.Exit(run())
+func durationEnv(name string, def time.Duration) (time.Duration, error) {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return def, nil
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d < 0 || d > time.Hour {
+		return 0, fmt.Errorf("%s must be a duration from 0 to 1h, such as 5m or 0", name)
+	}
+	return d, nil
 }
 
-func run() int {
+// httpURLEnv validates an optional URL. Error text names the variable, never its value.
+func httpURLEnv(name string) (string, error) {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return "", nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+		return "", fmt.Errorf("%s is set but is not a valid http(s) URL", name)
+	}
+	return raw, nil
+}
+
+func runOnce() int {
 	cfg, err := loadConfig()
 	if err != nil {
 		slog.Error("configuration error", "error", err)
 		return 2
 	}
 
+	start := time.Now()
+	plan := slot.PlanFor(start, cfg.slotOverride, cfg.attempt, cfg.manual)
+	if plan.Skip {
+		slog.Info("outside slot window, skipping",
+			"slot", slot.ID(plan.Slot),
+			"elapsed_minutes", int(start.UTC().Sub(plan.Slot).Minutes()),
+			"window_hours", int(slot.Window.Hours()))
+		return 0
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	deadline := start.Add(runBudget)
+	runCtx, cancel := context.WithDeadline(ctx, deadline)
+	defer cancel()
 
+	st := &status{slotID: slot.ID(plan.Slot), attempt: plan.Attempt, dryRun: cfg.dryRun}
+	slog.Info("starting daily check",
+		"slot", st.slotID, "attempt", plan.Attempt, "final_attempt", plan.Final(),
+		"dry_run", cfg.dryRun, "manual", cfg.manual)
+
+	code := execute(runCtx, cfg, plan, deadline, st)
+
+	if !cfg.dryRun {
+		primary := health.New(cfg.healthURL)
+		if st.complete {
+			if err := primary.Success(ctx); err != nil {
+				slog.Warn("healthcheck success ping failed", "error", err)
+			}
+		} else {
+			if err := primary.Fail(ctx); err != nil {
+				slog.Warn("healthcheck fail ping failed", "error", err)
+			}
+			if plan.Final() {
+				st.final = true
+				final := health.New(cfg.finalHealthURL)
+				if err := final.Fail(ctx); err != nil {
+					slog.Warn("final healthcheck fail ping failed", "error", err)
+				}
+			}
+		}
+	}
+
+	if err := writeOutputs(cfg.outputPath, st); err != nil {
+		slog.Warn("could not write workflow outputs", "error", err)
+	}
+	return code
+}
+
+// execute runs the check for the slot and fills st. It returns the exit code.
+func execute(ctx context.Context, cfg config, plan slot.Plan, deadline time.Time, st *status) int {
 	conn, err := db.Connect(ctx, cfg.dsn)
 	if err != nil {
 		slog.Error("database unreachable", "error", err)
 		return 1
 	}
-	defer func() { _ = conn.Close(ctx) }()
+	defer func() { _ = conn.Close(context.Background()) }()
 
-	sum, err := execute(ctx, conn, cfg)
+	steamID, err := db.SteamStoreID(ctx, conn)
+	if err != nil {
+		slog.Error("database unreachable", "error", err)
+		return 1
+	}
+
+	res, err := run.Execute(ctx, db.NewRepo(conn, steamID), steam.NewClient(steam.DefaultConfig()), run.Options{
+		SteamStoreID: steamID,
+		SlotStart:    plan.Slot,
+		DryRun:       cfg.dryRun,
+		Limit:        cfg.limit,
+		RetryWait1:   cfg.retryWait1,
+		RetryWait2:   cfg.retryWait2,
+		Deadline:     deadline,
+	})
 	if err != nil {
 		slog.Error("daily check aborted", "error", err)
-		printSummary(sum, cfg.dryRun)
 		return 1
 	}
-	printSummary(sum, cfg.dryRun)
 
-	if sum.FailureRate() > maxFailureRate {
-		slog.Error("failure rate above threshold", "rate_pct", int(sum.FailureRate()*100), "threshold_pct", int(maxFailureRate*100))
+	st.total = res.Total
+	st.failed = res.Failed
+	st.coverage = res.CoverageAfter
+	st.alreadyComplete = res.AlreadyComplete
+	printSummary(res, cfg.dryRun)
+
+	if !run.Succeeded(res.CoverageAfter) {
+		slog.Error("coverage below threshold for this attempt",
+			"coverage_pct", res.CoverageAfter*100, "threshold_pct", run.MinCoverage*100)
 		return 1
 	}
+	st.complete = true
 	return 0
 }
 
-// execute loads active Steam games and processes each one. Per-game failures are
-// counted and logged, not returned, so one bad title never aborts the run.
-func execute(ctx context.Context, conn *pgx.Conn, cfg config) (Summary, error) {
-	var sum Summary
-
-	steamStoreID, err := db.SteamStoreID(ctx, conn)
+// writeOutputs appends flags to the GITHUB_OUTPUT file. A missing path is a no-op
+// (local runs). Values never contain secrets.
+func writeOutputs(path string, st *status) error {
+	if path == "" {
+		return nil
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o644)
 	if err != nil {
-		return sum, err
+		return err
 	}
-	games, err := db.ListActiveSteamGames(ctx, conn, steamStoreID, cfg.limit)
-	if err != nil {
-		return sum, err
+	defer f.Close()
+
+	lines := []string{
+		"slot_id=" + st.slotID,
+		fmt.Sprintf("attempt=%d", st.attempt),
+		fmt.Sprintf("final_attempt=%t", st.final),
+		fmt.Sprintf("slot_complete=%t", st.complete && !st.dryRun),
+		fmt.Sprintf("coverage_pct=%.1f", st.coverage*100),
+		fmt.Sprintf("failed_games=%d", st.failed),
+		fmt.Sprintf("total_games=%d", st.total),
 	}
-	slog.Info("loaded active games", "count", len(games), "dry_run", cfg.dryRun, "limit", cfg.limit)
-
-	client := steam.NewClient(steam.DefaultConfig())
-	store := db.PgStore{Conn: conn}
-
-	for _, g := range games {
-		if err := ctx.Err(); err != nil {
-			return sum, fmt.Errorf("run cancelled: %w", err)
-		}
-		sum.Checked++
-
-		if g.ExternalAppID == "" {
-			sum.Failed++
-			slog.Warn("no steam app mapping for game", "slug", g.Slug)
-			continue
-		}
-
-		res, err := client.FetchPrice(ctx, g.ExternalAppID, steamCountry)
-		if err != nil {
-			if errors.Is(err, steam.ErrNotFound) || errors.Is(err, steam.ErrPriceUnavailable) {
-				sum.Skipped++
-				slog.Info("skipped: no price on steam for this country", "slug", g.Slug, "app_id", g.ExternalAppID, "reason", err.Error())
-				continue
-			}
-			if ctx.Err() != nil {
-				return sum, fmt.Errorf("run cancelled: %w", ctx.Err())
-			}
-			sum.Failed++
-			slog.Warn("price fetch failed", "slug", g.Slug, "app_id", g.ExternalAppID, "error", err)
-			continue
-		}
-
-		if cfg.dryRun {
-			sum.Updated++
-			slog.Info("dry run: would write snapshot", "slug", g.Slug, "app_id", g.ExternalAppID,
-				"current_price", res.CurrentPrice, "discount_pct", res.DiscountPct, "is_deal", res.IsDeal)
-			continue
-		}
-
-		if _, _, err := pricing.ProcessPriceResult(ctx, store, g.ID, steamStoreID, res); err != nil {
-			if ctx.Err() != nil {
-				return sum, fmt.Errorf("run cancelled: %w", ctx.Err())
-			}
-			sum.Failed++
-			slog.Warn("processing price result failed", "slug", g.Slug, "error", err)
-			continue
-		}
-		sum.Updated++
-	}
-	return sum, nil
+	_, err = f.WriteString(strings.Join(lines, "\n") + "\n")
+	return err
 }
 
-func printSummary(s Summary, dryRun bool) {
-	fmt.Printf("summary dry_run=%t checked=%d updated=%d skipped=%d failed=%d failure_rate=%.1f%%\n",
-		dryRun, s.Checked, s.Updated, s.Skipped, s.Failed, s.FailureRate()*100)
+func printSummary(r run.Result, dryRun bool) {
+	fmt.Printf("summary dry_run=%t already_complete=%t total=%d unmapped=%d already_done=%d missing=%d "+
+		"updated=%d skipped=%d failed=%d retried=%d coverage_before=%.1f%% coverage_after=%.1f%%\n",
+		dryRun, r.AlreadyComplete, r.Total, r.Unmapped, r.DoneBefore, r.Missing,
+		r.Updated, r.Skipped, r.Failed, r.Retried, r.CoverageBefore*100, r.CoverageAfter*100)
 }
