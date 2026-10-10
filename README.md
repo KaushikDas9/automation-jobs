@@ -99,10 +99,22 @@ they never open a failure issue. Start with a dry run after any change.
 happens on GitHub. It covers pushes to `main`, pull requests (opened, reopened, ready for
 review, merged, closed), issues (opened, closed, reopened), new comments on issues and
 pull requests (bots are skipped), published releases, and failed runs of the GameDeal
-Radar job. Every message starts with `[Automation Jobs]`. The workflow needs the
-`SLACK_WEBHOOK_URL` secret in each repository that uses it, including this one. Without
-the secret, the job logs "Slack webhook not configured, skipping" and passes. Set it with
-`gh secret set SLACK_WEBHOOK_URL`.
+Radar job.
+
+Every message starts with a tag in square brackets. The default tag is the product name,
+`[GameDeal Radar]`, set once in the `env` block at the top of the workflow. The tag
+changes only for pushes: when every changed file in the push sits in one
+`projects/<name>/` folder, and that folder is not `gamedeal-radar` or `_template`, the tag
+is the folder name made friendly (dashes become spaces, each word is capitalised). For
+example, a push that only touches `projects/foo-bar/` posts `[Foo Bar]`. A push that
+touches several folders, or files outside `projects/`, keeps `[GameDeal Radar]`. So a new
+project gets its own tag automatically, with no workflow change, as soon as a push touches
+only its folder. Pull requests, issues, comments, releases and failed runs always use the
+default tag.
+
+The workflow needs the `SLACK_WEBHOOK_URL` secret in each repository that uses it,
+including this one. Without the secret, the job logs "Slack webhook not configured,
+skipping" and passes. Set it with `gh secret set SLACK_WEBHOOK_URL`.
 
 ## Security rules
 

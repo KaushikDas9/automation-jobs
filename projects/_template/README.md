@@ -18,8 +18,10 @@ minimal Go module with a stub job, a workflow template, and a place for docs.
    set the cron, the working directory and the secret names. Per-project secrets are
    named `PROJECT_NAME_SECRET`, for example `MYPROJ_API_TOKEN`. The Slack webhook is the
    exception: use the shared `SLACK_WEBHOOK_URL`, because every project posts to one channel.
-4. Give every Slack message a project tag at the start, for example `[MyProj]`, so the
-   shared channel stays readable.
+4. Give every Slack message from the job a project tag at the start, for example
+   `[MyProj]`, so the shared channel stays readable. The GitHub activity notifications
+   (`slack-notify.yml`) need no change: a push that only touches `projects/my-proj/` is
+   tagged `[My Proj]` automatically, from the folder name.
 5. Write this README: what the job does, its exit codes, its env vars and its schedule.
 6. Run `go vet ./... && go test ./...` inside the project folder, then open a PR.
 

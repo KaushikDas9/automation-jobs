@@ -6,6 +6,11 @@ name: Slack GitHub notify
 # pasted into the script text. Commit messages are read from the event payload file
 # (GITHUB_EVENT_PATH) because a large push can be too big for a single env var.
 
+# Default tag for every message. A push that only touches one projects/<name>/ folder
+# (other than gamedeal-radar and _template) is tagged with that folder's name instead.
+env:
+  PROJECT_NAME: GameDeal Radar
+
 on:
   push:
     branches: [main]
@@ -35,7 +40,6 @@ jobs:
     steps:
       - name: Build and send the Slack message
         env:
-          PROJECT_NAME: Automation Jobs
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           EVENT_NAME: ${{ github.event_name }}
           ACTION: ${{ github.event.action }}
@@ -72,6 +76,25 @@ jobs:
           fi
 
           tag="[${PROJECT_NAME}]"
+
+          # Push only: if every changed file (added, removed, modified in all commits) sits in
+          # one projects/<folder>/ directory, tag with that folder as a friendly name, for
+          # example projects/foo-bar -> [Foo Bar]. Otherwise keep the default tag.
+          # The paths are read from the payload file as data; nothing is run from them.
+          if [ "${EVENT_NAME:-}" = "push" ] && [ "${PUSH_DELETED:-}" != "true" ]; then
+            folder="$(jq -r '
+              [(.commits // [])[] | ((.added // []) + (.removed // []) + (.modified // []))[]] | unique as $files
+              | [$files[] | split("/") | if length >= 3 and .[0] == "projects" then .[1] else "" end] | unique as $dirs
+              | if ($files | length) > 0 and ($dirs | length) == 1 and $dirs[0] != ""
+                   and $dirs[0] != "gamedeal-radar" and $dirs[0] != "_template"
+                then $dirs[0] else "" end
+            ' "$GITHUB_EVENT_PATH" 2>/dev/null)"
+            if [ -n "$folder" ]; then
+              friendly="$(jq -rn --arg f "$folder" '
+                $f | split("-") | map(select(length > 0) | (.[0:1] | ascii_upcase) + .[1:]) | join(" ")')"
+              if [ -n "$friendly" ]; then tag="[${friendly}]"; fi
+            fi
+          fi
 
           # Collapse whitespace, cut to $2 characters, escape Slack's &, < and >.
           # The text is passed to jq as data and is never run as code.
