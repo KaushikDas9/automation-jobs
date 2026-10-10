@@ -1,0 +1,54 @@
+name: GameDeal Radar daily price check
+
+on:
+  schedule:
+    # 03:00 IST (UTC+5:30) is 21:30 UTC the previous day. GitHub cron is UTC.
+    - cron: "30 21 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Fetch prices but write nothing to the database"
+        type: boolean
+        default: true
+      limit:
+        description: "Max games to process (leave empty for all)"
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gamedeal-radar-daily
+  cancel-in-progress: false
+
+jobs:
+  price-check:
+    name: Steam India price check
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: projects/gamedeal-radar
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache-dependency-path: projects/gamedeal-radar/go.sum
+
+      - name: Build and test
+        run: |
+          go vet ./...
+          go test ./...
+
+      - name: Run daily check
+        env:
+          GDR_DATABASE_URL: ${{ secrets.GDR_DATABASE_URL }}
+          DRY_RUN: ${{ inputs.dry_run == true && '1' || '0' }}
+          LIMIT: ${{ inputs.limit }}
+        run: go run ./cmd/daily-check

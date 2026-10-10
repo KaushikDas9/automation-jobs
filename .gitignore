@@ -1,0 +1,20 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Go build output
+*.exe
+*.test
+*.out
+/bin/
+/dist/
+projects/*/server
+projects/*/daily-check
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
