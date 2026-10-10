@@ -1,0 +1,40 @@
+# Copy to .github/workflows/<project-name>-<job>.yml at the repository root.
+# GitHub only reads workflows from .github/workflows/, so every project's workflow
+# lives there with a project-name prefix. Do not use paths: filters here.
+name: <project-name> <job>
+
+on:
+  schedule:
+    # cron is always UTC. IST = UTC+5:30, so 09:00 IST is 03:30 UTC: "30 3 * * *".
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run without writing anything"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read # add more only when the job needs them, for example issues: write
+
+concurrency:
+  group: <project-name>-<job>
+  cancel-in-progress: false # never overlap, never cancel a running job
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: projects/<project-name>
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+      - name: Run
+        env:
+          # Secrets are PROJECT_NAME_SECRET. Map each one to the step that needs it.
+          MYPROJ_API_TOKEN: ${{ secrets.MYPROJ_API_TOKEN }}
+        run: go run ./cmd/job

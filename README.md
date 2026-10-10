@@ -1,135 +1,101 @@
 # automation-jobs
 
-Scheduled jobs for my projects, run on GitHub Actions instead of on always-on servers.
-Each project lives in its own folder under `projects/` as a self-contained Go module
-(its own `go.mod`), and each gets one workflow under `.github/workflows/`.
+Scheduled jobs for my projects, run on GitHub Actions instead of always-on servers.
 
-## Layout
+Each project is self-contained. It lives in its own folder under `projects/<name>/`,
+with its own `go.mod`, README, and docs. Its workflow lives in `.github/workflows/`
+with a `<name>-` prefix, because GitHub only reads workflows from that folder. Projects
+share no code and no secrets. Every secret is prefixed with its project's name.
 
-```
-.github/workflows/
-  gamedeal-radar-daily.yml     schedule + manual trigger for the GameDeal Radar job
-projects/
-  gamedeal-radar/              Go module: daily Steam India price check
-    cmd/daily-check/main.go    entry point (config from env, summary, exit codes)
-    internal/steam/            Steam appdetails client, rate limiter, response parser
-    internal/pricing/          snapshot + price-event rules (NEW_DEAL, PRICE_DROP, DEAL_ENDED)
-    internal/db/               Postgres queries (pgx)
-    db-role.sql                least-privilege DB role (documentation only, not executed)
-```
+## Projects
 
-## GameDeal Radar daily check
-
-Runs twice a day, timed to follow Steam's daily deal refresh (unverified: around
-10:00 AM Pacific, which is 18:00 UTC in winter or 17:00 UTC in summer):
-
-| Run | Cron (UTC) | IST | Notes |
+| Project | What it does | Schedule (UTC) | Docs |
 | --- | --- | --- | --- |
-| Morning | `30 18 * * *` | 00:00 | About 30 min after refresh in winter, about 90 min in summer |
-| Noon | `30 6 * * *` | 12:00 | Twelve hours after the first run |
+| [gamedeal-radar](projects/gamedeal-radar/) | Daily Steam India price check. Two slots a day, six attempts each. | 06:30 and 18:30, with retries until 11:30 and 23:30 | [README](projects/gamedeal-radar/README.md) |
+| [_template](projects/_template/) | Starter for a new project. Not a real job. | none | [README](projects/_template/README.md) |
 
-Each run takes roughly 11 minutes, so about 22 minutes a day in total (estimate, not
-measured yet). The `concurrency` group `gamedeal-radar-daily` with
-`cancel-in-progress: false` means a run never overlaps another: if one is still
-going when the next starts, the next waits in the queue.
+## Add a new project in 5 steps
 
-Scheduled runs are real writes. Only manual `workflow_dispatch` runs default to dry
-run. GitHub can also start scheduled runs 5 to 30 minutes late.
+1. Copy the template: `cp -r projects/_template projects/<project-name>`. Use lowercase
+   letters and hyphens for the name.
+2. Edit `projects/<project-name>/go.mod` and `cmd/job/main.go`. Keep everything inside
+   the folder. Do not import code from another project.
+3. Copy `projects/<project-name>/workflow.yml.example` to
+   `.github/workflows/<project-name>-<job>.yml`. Set the cron (UTC), the working
+   directory, and the secret names. Keep `concurrency` with `cancel-in-progress: false`
+   and `timeout-minutes` at or below what the job needs.
+4. Write `projects/<project-name>/README.md`, covering what it does, its exit codes,
+   its env vars, and its schedule. Add a `db-role.sql` if it uses Postgres. Add a row to
+   the table above.
+5. Verify locally with `go vet ./... && go test ./...`, then open a PR. Add the secrets
+   under the repository's Settings, then Secrets and variables, then Actions. Trigger a
+   `workflow_dispatch` run first, in dry-run mode if the job supports it.
 
-To shift the times, edit both `cron` lines in
-`.github/workflows/gamedeal-radar-daily.yml`. Convert IST to UTC by subtracting 5h30m,
-and remember that Steam's refresh moves between 17:00 and 18:00 UTC with US daylight
-saving time, while GitHub cron does not. For each active game it fetches the Steam
-India (`cc=in`, INR) price at no more than 1 request per second, writes a price
-snapshot, updates the current-price row, and records a price event when the deal
-state changes. It is a port of the server's `ProcessPriceResult`. The differences
-from the server are listed in the commit message that added this job.
+## Secrets
 
-Exit codes: `0` success, `1` the run failed (database unreachable, more than 20% of
-games failed, or the run was cancelled), `2` configuration error.
+Names are `PROJECT_NAME_SECRET` in upper case, for example:
 
-Environment variables the job reads:
+- `GDR_DATABASE_URL`, the GameDeal Radar database connection
+- `GDR_HEALTHCHECK_URL` and `GDR_HEALTHCHECK_FINAL_URL`, GameDeal Radar healthcheck URLs
+- `MYPROJ_API_TOKEN`, a placeholder for another project
 
-| Name | Required | Meaning |
-| --- | --- | --- |
-| `GDR_DATABASE_URL` | yes | Postgres connection string. Never logged. |
-| `DRY_RUN` | no | `1` or `true` fetches prices but writes nothing. |
-| `LIMIT` | no | Max number of games to process, for testing. |
+Give each project its own database role and credentials. Never share a super-user
+connection string.
 
-Run the tests locally with no network or database needed:
+## Why jobs cannot stack up
 
-```sh
-cd projects/gamedeal-radar
-go vet ./... && go test ./...
-```
+GitHub's `concurrency` group `gamedeal-radar-daily` is set with
+`cancel-in-progress: false`. That gives two guarantees:
 
-## Adding a job for a new project
+- At most one run is active at a time. Its own attempts never overlap.
+- At most one run waits behind it. GitHub replaces any further pending run, so a
+  backlog never builds up.
 
-1. Create `projects/<project-name>/` with its own `go.mod` (or other tooling). Keep it
-   self-contained so it can build without the rest of the repo.
-2. Add `.github/workflows/<project-name>-<job>.yml`, modelled on
-   `gamedeal-radar-daily.yml`:
-   - `on: schedule` with a cron expression (or several), plus `workflow_dispatch` so you can run it
-     by hand.
-   - `permissions: contents: read` (the default for any new workflow).
-   - A `concurrency` group unique to this job, with `cancel-in-progress: false`, so
-     runs never overlap.
-   - `timeout-minutes` set to a value that fits the job.
-   - Pin third-party actions to a major version, for example `actions/checkout@v4`.
-3. Pass secrets to the step that needs them as `env:` entries, not as command-line
-   arguments.
+The schedule leaves a gap of about 7 hours after the last attempt of each slot. The
+program also ignores any run that starts more than 6 hours after its slot start, and it
+never reuses a past slot's leftovers. Every slot starts fresh: only the games not yet
+checked in that slot are fetched. A late or stuck run therefore cannot touch the next
+slot's data.
 
-## Secrets naming
+## Cron and UTC
 
-Repository secrets are named `PROJECT_NAME_SECRET`, with the project name in upper
-case and underscores:
+GitHub cron is always UTC with five fields: `minute hour day month weekday`.
 
-- `GDR_DATABASE_URL` for GameDeal Radar's database connection
-- `<OTHER>_API_KEY` and so on for other projects
-
-Add secrets under Settings, then Secrets and variables, then Actions. Give each project
-its own database role and credentials. Do not share one super-user connection string
-across projects.
-
-## Schedules and UTC
-
-GitHub cron expressions are always UTC, with five fields: `minute hour day month weekday`.
-
-- IST is UTC+5:30, so subtract 5h30m from IST to get UTC. 00:00 IST is 18:30 UTC the
-  previous day, which gives `30 18 * * *`.
-- Scheduled runs can start late, sometimes by 10 to 30 minutes, when GitHub is busy.
-  Do not schedule anything that must start at an exact time.
-- Scheduled runs use the default branch.
+- IST is UTC+5:30. Subtract 5h30m from IST to get UTC. For example, 12:00 IST is 06:30
+  UTC.
+- GitHub can start scheduled runs 5 to 30 minutes late under load. Do not depend on an
+  exact start time. The programs allow a 20 minute tolerance when mapping a run to an
+  attempt.
 - In a public repository, GitHub disables scheduled workflows after 60 days with no
-  repository activity. Push a commit or re-enable the workflow if this happens.
+  repository activity.
+- Scheduled runs use the default branch.
 
-## Running a job manually
+## Manual runs
 
-1. Open the repository on GitHub, then the Actions tab.
-2. Choose the workflow, then Run workflow.
-3. Set the inputs. `dry_run` is on by default. Leave `limit` empty for a full run.
+1. Open the repository's Actions tab, choose the workflow, then choose Run workflow.
+2. Set the inputs. `dry_run` defaults to true. Leave `limit` empty for a full run.
 
-Always start with a dry run after a change. A dry run fetches prices from Steam and
-logs what it would write, without writing to the database.
+Manual runs skip the slot window check and are not counted as scheduled attempts, so
+they never open a failure issue. Start with a dry run after any change.
 
 ## Failure notifications
 
-GitHub's default behaviour is enough for now. When a scheduled run fails, GitHub emails
-the account that last changed the workflow file. Failed manual runs show a red status
-in the Actions tab. If you want a richer alert later, add a notification step to the
-workflow.
+- Any run that ends below the coverage threshold fails. GitHub's default failed-run email
+  covers this. The healthcheck is also pinged with `/fail`, if one is set up.
+- The sixth and final attempt of a slot also opens a GitHub issue labelled `job-failure`
+  (see the project README), and pings the optional final healthcheck.
+- When a later slot completes, the open `job-failure` issues are closed with a comment.
 
 ## Security rules
 
-- No secrets, passwords, tokens, or real connection strings in the repository, in
-  commit messages, in workflow files, or in logs. Use Actions secrets only.
-- Do not print environment variables. Code that handles a connection string must
-  scrub it from any error text before logging it.
-- Do not commit `.env` files. `.gitignore` covers them, but check `git status` before
-  each commit.
-- Internal-only URLs, hostnames, and IP addresses stay out of the repository too. The
-  repository may become public.
-- Database access uses the least privilege the job needs. See
+- No secrets, passwords, tokens, or real connection strings in the repository, commit
+  messages, workflow files, or logs. Use Actions secrets only.
+- Do not print environment variables. Code that handles connection strings or healthcheck
+  URLs must scrub them from error text.
+- Do not commit `.env` files. `.gitignore` covers them, but check `git status` before each
+  commit.
+- No internal-only URLs, hostnames, or IP addresses in the repository. It may become
+  public.
+- Use the least database privilege the job needs. See
   `projects/gamedeal-radar/db-role.sql` for the pattern.
-- Respect third-party rate limits. The Steam client never sends more than 1 request
-  per second, and it backs off on HTTP 429. Do not bypass these limits.
+- Respect third-party rate limits. Do not bypass them.
