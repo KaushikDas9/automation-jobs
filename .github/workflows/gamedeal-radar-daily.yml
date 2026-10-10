@@ -1,35 +1,53 @@
 name: GameDeal Radar daily price check
 
-# Schedule assumption (UNVERIFIED): Steam refreshes its deals around 10:00 AM
-# Pacific Time. That is 18:00 UTC in winter (PST, UTC-8) and 17:00 UTC in summer
-# (PDT, UTC-7). GitHub cron is UTC only and does not observe DST, so the two runs
-# below are fixed in UTC:
-#   "30 18 * * *"  18:30 UTC = 00:00 IST. About 30 min after the refresh in winter,
-#                  about 90 min after in summer.
-#   "30 6 * * *"   06:30 UTC = 12:00 IST. Twelve hours after the first run.
-# IST is UTC+5:30 with no DST. To convert IST to UTC, subtract 5h30m.
-# GitHub can start scheduled runs 5 to 30 minutes late under load, so do not rely
-# on an exact start time.
+# Steam refreshes deals around 10:00 AM Pacific. That is 18:00 UTC in winter (PST) and
+# 17:00 UTC in summer (PDT). This is an UNVERIFIED assumption. GitHub cron is UTC only
+# and does not observe DST, so the times below are fixed in UTC. IST is UTC+5:30 with
+# no DST, so subtract 5h30m from IST to get UTC.
+#
+# Two slots per day, each with six attempts at growing gaps (offsets from the slot start):
+#   Slot A (main 18:30 UTC = 00:00 IST), attempts at +0, +30, +75, +135, +210, +300 min
+#   Slot B (main 06:30 UTC = 12:00 IST), attempts at +0, +30, +75, +135, +210, +300 min
+# The program maps each run to its attempt number using a 20 minute tolerance, because
+# GitHub can start scheduled runs 5 to 30 minutes late. The last attempt of each slot
+# ends about 7 hours before the next slot starts, so runs never reach the next slot.
 
 on:
   schedule:
-    - cron: "30 18 * * *"
-    - cron: "30 6 * * *"
+    # Slot A (starts 18:30 UTC)
+    - cron: "30 18 * * *"  # attempt 1, +0 min   (18:30 UTC, 00:00 IST)
+    - cron: "0 19 * * *"   # attempt 2, +30 min  (19:00 UTC)
+    - cron: "45 19 * * *"  # attempt 3, +75 min  (19:45 UTC)
+    - cron: "45 20 * * *"  # attempt 4, +135 min (20:45 UTC)
+    - cron: "0 22 * * *"   # attempt 5, +210 min (22:00 UTC)
+    - cron: "30 23 * * *"  # attempt 6, +300 min (23:30 UTC), final attempt of slot A
+    # Slot B (starts 06:30 UTC)
+    - cron: "30 6 * * *"   # attempt 1, +0 min   (06:30 UTC, 12:00 IST)
+    - cron: "0 7 * * *"    # attempt 2, +30 min  (07:00 UTC)
+    - cron: "45 7 * * *"   # attempt 3, +75 min  (07:45 UTC)
+    - cron: "45 8 * * *"   # attempt 4, +135 min (08:45 UTC)
+    - cron: "0 10 * * *"   # attempt 5, +210 min (10:00 UTC)
+    - cron: "30 11 * * *"  # attempt 6, +300 min (11:30 UTC), final attempt of slot B
   workflow_dispatch:
+    # Manual runs skip the slot window check and are not counted as a scheduled attempt.
+    # They default to dry run. Untick dry_run to write data.
     inputs:
       dry_run:
         description: "Fetch prices but write nothing to the database"
         type: boolean
         default: true
       limit:
-        description: "Max games to process (leave empty for all)"
+        description: "Max games to fetch (leave empty for all)"
         type: string
         required: false
         default: ""
 
 permissions:
   contents: read
+  # Only used by the final-failure and recovery steps to manage job-failure issues.
+  issues: write
 
+# At most one run is active and one is pending. A new run never cancels a running one.
 concurrency:
   group: gamedeal-radar-daily
   cancel-in-progress: false
@@ -58,15 +76,59 @@ jobs:
           go test ./...
 
       - name: Run daily check
+        id: check
         env:
           GDR_DATABASE_URL: ${{ secrets.GDR_DATABASE_URL }}
-          # Inputs exist only on workflow_dispatch. On schedule events
-          # github.event_name is "schedule", so the first clause is false and
-          # the expression yields '0' (a real write run, since only "1" or
-          # "true" enables dry run). A manual run uses inputs.dry_run, which
-          # defaults to true, and yields '1' unless the boolean is unticked.
+          GDR_HEALTHCHECK_URL: ${{ secrets.GDR_HEALTHCHECK_URL }}
+          GDR_HEALTHCHECK_FINAL_URL: ${{ secrets.GDR_HEALTHCHECK_FINAL_URL }}
+          # Inputs exist only on workflow_dispatch. On schedule the first clause is
+          # false, so DRY_RUN is '0' (real write) and LIMIT is '' (no limit).
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true && '1' || '0' }}
-          # On schedule the expression yields '' (no limit). On manual runs it
-          # passes the typed value, which is '' when left empty.
           LIMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.limit || '' }}
+        # The program writes slot_id, attempt, final_attempt, slot_complete, coverage_pct,
+        # failed_games and total_games to GITHUB_OUTPUT, even when it exits 1.
         run: go run ./cmd/daily-check
+
+      - name: Open issue on final failure
+        # Runs only when this job failed and the program flagged the sixth attempt.
+        if: failure() && steps.check.outputs.final_attempt == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SLOT_ID: ${{ steps.check.outputs.slot_id }}
+          COVERAGE: ${{ steps.check.outputs.coverage_pct }}
+          FAILED: ${{ steps.check.outputs.failed_games }}
+          TOTAL: ${{ steps.check.outputs.total_games }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          TITLE="GameDeal Radar: slot ${SLOT_ID} failed after 6 attempts"
+          gh label create job-failure --force --color B60205 \
+            --description "GameDeal Radar job failures" >/dev/null 2>&1 || true
+          if gh issue list --state open --label job-failure --limit 200 --json title --jq '.[].title' \
+            | grep -Fxq "$TITLE"; then
+            echo "An open issue with this title already exists. Not creating a duplicate."
+            exit 0
+          fi
+          BODY=$(mktemp)
+          {
+            echo "The final attempt (6 of 6) for slot ${SLOT_ID} ended with coverage below 90%."
+            echo
+            echo "- Coverage: ${COVERAGE}% of active games checked in this slot"
+            echo "- Games failed in the final attempt: ${FAILED} of ${TOTAL}"
+            echo "- Run: ${RUN_URL}"
+            echo
+            echo "No secrets are included here. Check the run log for per-game errors."
+          } > "$BODY"
+          gh issue create --title "$TITLE" --label job-failure --body-file "$BODY" \
+            || echo "Could not create the failure issue. The run log has the details."
+
+      - name: Close job-failure issues after recovery
+        # Best effort. A failure here never fails the job.
+        if: success() && steps.check.outputs.slot_complete == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SLOT_ID: ${{ steps.check.outputs.slot_id }}
+        run: |
+          for n in $(gh issue list --state open --label job-failure --limit 200 --json number --jq '.[].number'); do
+            gh issue close "$n" --comment "Recovered at slot ${SLOT_ID}. The job completed successfully." || true
+          done
