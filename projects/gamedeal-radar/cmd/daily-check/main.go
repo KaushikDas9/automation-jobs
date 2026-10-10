@@ -10,6 +10,9 @@
 //	RETRY_WAIT_1, RETRY_WAIT_2  waits before retry passes, Go durations (default 5m, 10m; "0" for tests).
 //	GDR_HEALTHCHECK_URL       dead man's switch URL. Optional. Never logged.
 //	GDR_HEALTHCHECK_FINAL_URL pinged with /fail on the final attempt's failure. Optional.
+//	GDR_SLACK_WEBHOOK_URL     Slack Incoming Webhook URL. Optional. Never logged.
+//	GDR_NOTIFY_TEMPLATE_DIR   folder with success.tmpl, attempt_failed.tmpl, final_failed.tmpl
+//	                          to override the Slack message text. Optional.
 //	GITHUB_EVENT_NAME         set by Actions. "workflow_dispatch" marks a manual run.
 //	GITHUB_OUTPUT             set by Actions. Receives flags for the notification steps.
 //
@@ -33,6 +36,7 @@ import (
 
 	"gamedeal-radar/daily-check/internal/db"
 	"gamedeal-radar/daily-check/internal/health"
+	"gamedeal-radar/daily-check/internal/notify"
 	"gamedeal-radar/daily-check/internal/run"
 	"gamedeal-radar/daily-check/internal/slot"
 	"gamedeal-radar/daily-check/internal/steam"
@@ -67,6 +71,9 @@ type status struct {
 	coverage        float64
 	failed          int
 	total           int
+	updated         int
+	skipped         int
+	retried         int
 }
 
 func main() {
@@ -201,10 +208,58 @@ func runOnce() int {
 		}
 	}
 
+	sendSlack(ctx, notify.New(os.Getenv), st, plan, time.Since(start))
+
 	if err := writeOutputs(cfg.outputPath, st); err != nil {
 		slog.Warn("could not write workflow outputs", "error", err)
 	}
 	return code
+}
+
+// notifyKind decides which Slack message, if any, a finished run sends. Dry runs and
+// backup runs that found the slot already complete stay silent.
+func notifyKind(st *status, final bool) (string, bool) {
+	if st.dryRun {
+		return "", false
+	}
+	if st.complete {
+		if st.alreadyComplete || st.updated+st.skipped == 0 {
+			return "", false
+		}
+		return notify.Success, true
+	}
+	if final {
+		return notify.FinalFailed, true
+	}
+	return notify.AttemptFailed, true
+}
+
+// sendSlack posts the run summary to Slack. It is best effort: a failure is logged
+// (without the URL) and never changes the exit code.
+func sendSlack(ctx context.Context, n notify.Notifier, st *status, plan slot.Plan, took time.Duration) {
+	if !n.Enabled() {
+		return
+	}
+	kind, ok := notifyKind(st, plan.Final())
+	if !ok {
+		return
+	}
+	n.Logf = func(msg string, err error) { slog.Warn(msg, "error", err) }
+	err := n.Send(ctx, kind, notify.Data{
+		SlotLabel:   notify.SlotLabel(plan.Slot),
+		Attempt:     st.attempt,
+		Total:       st.total,
+		Updated:     st.updated,
+		Skipped:     st.skipped,
+		Failed:      st.failed,
+		Retried:     st.retried,
+		CoveragePct: notify.FormatCoverage(st.coverage),
+		Duration:    took.Round(time.Second).String(),
+		RunURL:      notify.RunURL(os.Getenv),
+	})
+	if err != nil {
+		slog.Warn("slack notification failed", "kind", kind, "error", err)
+	}
 }
 
 // execute runs the check for the slot and fills st. It returns the exit code.
@@ -240,6 +295,9 @@ func execute(ctx context.Context, cfg config, plan slot.Plan, deadline time.Time
 	st.failed = res.Failed
 	st.coverage = res.CoverageAfter
 	st.alreadyComplete = res.AlreadyComplete
+	st.updated = res.Updated
+	st.skipped = res.Skipped
+	st.retried = res.Retried
 	printSummary(res, cfg.dryRun)
 
 	if !run.Succeeded(res.CoverageAfter) {

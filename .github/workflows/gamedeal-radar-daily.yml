@@ -81,6 +81,7 @@ jobs:
           GDR_DATABASE_URL: ${{ secrets.GDR_DATABASE_URL }}
           GDR_HEALTHCHECK_URL: ${{ secrets.GDR_HEALTHCHECK_URL }}
           GDR_HEALTHCHECK_FINAL_URL: ${{ secrets.GDR_HEALTHCHECK_FINAL_URL }}
+          GDR_SLACK_WEBHOOK_URL: ${{ secrets.GDR_SLACK_WEBHOOK_URL }}
           # Inputs exist only on workflow_dispatch. On schedule the first clause is
           # false, so DRY_RUN is '0' (real write) and LIMIT is '' (no limit).
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true && '1' || '0' }}

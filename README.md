@@ -37,6 +37,7 @@ Names are `PROJECT_NAME_SECRET` in upper case, for example:
 
 - `GDR_DATABASE_URL`, the GameDeal Radar database connection
 - `GDR_HEALTHCHECK_URL` and `GDR_HEALTHCHECK_FINAL_URL`, GameDeal Radar healthcheck URLs
+- `GDR_SLACK_WEBHOOK_URL`, optional Slack Incoming Webhook for GameDeal Radar run messages
 - `MYPROJ_API_TOKEN`, a placeholder for another project
 
 Give each project its own database role and credentials. Never share a super-user

@@ -86,7 +86,56 @@ The issue includes the slot id, the coverage percentage, the number of games fai
 final attempt, and a link to the run. It has no secrets. If an open issue with the same
 title already exists, no duplicate is created.
 
-Secrets are never logged. Healthcheck URLs are scrubbed from any error text.
+Slack messages are described in the next section. Secrets are never logged. Healthcheck URLs are scrubbed from any error text.
+
+## Slack notifications
+
+Optional. If the secret is not set, nothing is sent and nothing is logged about it.
+
+### Set it up
+
+1. Go to https://api.slack.com/apps, choose **Create New App**, then **From scratch**.
+2. Open **Incoming Webhooks**, switch it on, and choose **Add New Webhook to Workspace**.
+   Pick the channel for the messages.
+3. Copy the webhook URL. In the GitHub repository open Settings, Secrets and variables,
+   Actions, and add a secret named `GDR_SLACK_WEBHOOK_URL` with that URL.
+
+The URL is a secret. Do not paste it into issues, commits, or chat. It is never logged,
+and it is removed from any error text.
+
+### When a message is sent
+
+| Situation | Message |
+| --- | --- |
+| A real run finishes with 90% or more coverage and did work (updated or skipped games) | `success` |
+| An attempt (1 to 5) ends below 90% coverage, or the database is unreachable | `attempt_failed` |
+| Attempt 6 ends below 90% coverage (in addition to the GitHub issue) | `final_failed` |
+| A backup attempt finds the slot already complete | nothing |
+| Dry run | nothing |
+
+Manual runs with dry run switched off can send messages. Slack is best effort: it has a
+10 second timeout and one retry, and a Slack problem never changes the job's result.
+
+### Customize the messages
+
+The default text lives in `internal/notify/messages.tmpl`, which is compiled into the
+program. To change the text without touching code, make a folder with any of
+`success.tmpl`, `attempt_failed.tmpl` and `final_failed.tmpl`, each holding only the
+message text, and point `GDR_NOTIFY_TEMPLATE_DIR` at it. A missing or broken file falls
+back to the default. Messages use Slack mrkdwn and Go `text/template` syntax. Fields:
+
+| Field | Meaning |
+| --- | --- |
+| `{{.SlotLabel}}` | Slot start in IST and UTC, for example `00:00 IST / 18:30 UTC, 11 Oct` |
+| `{{.Attempt}}` | Attempt number, 1 to 6 |
+| `{{.Total}}` | Active games with a Steam mapping |
+| `{{.Updated}}` | Price snapshots written in this run |
+| `{{.Skipped}}` | Games with no Steam price |
+| `{{.Failed}}` | Games that failed for good in this run |
+| `{{.Retried}}` | Games that went through a retry pass |
+| `{{.CoveragePct}}` | Coverage in this slot, for example `99.6` |
+| `{{.Duration}}` | How long this run took, for example `7m12s` |
+| `{{.RunURL}}` | Link to the Actions run (built from `GITHUB_SERVER_URL`, `GITHUB_REPOSITORY`, `GITHUB_RUN_ID`) |
 
 ## Why jobs cannot stack up
 
@@ -107,6 +156,8 @@ run that starts more than 6 hours after its slot start exits without fetching.
 | `RETRY_WAIT_2` | no | `10m` | Wait before the second retry pass. Go duration, `0` for tests. |
 | `GDR_HEALTHCHECK_URL` | no | none | Dead man's switch URL (secret). |
 | `GDR_HEALTHCHECK_FINAL_URL` | no | none | Second check URL (secret), pinged with `/fail` on the final attempt's failure. |
+| `GDR_SLACK_WEBHOOK_URL` | no | none | Slack Incoming Webhook URL (secret). Unset means no Slack messages. |
+| `GDR_NOTIFY_TEMPLATE_DIR` | no | none | Folder with `success.tmpl`, `attempt_failed.tmpl`, `final_failed.tmpl` to override message text. |
 
 ## Set up the healthchecks.io checks
 

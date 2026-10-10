@@ -1,12 +1,17 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"gamedeal-radar/daily-check/internal/notify"
 	"gamedeal-radar/daily-check/internal/slot"
 )
 
@@ -130,5 +135,80 @@ func TestLoadConfigMissingDatabaseURL(t *testing.T) {
 	setEnv(t, map[string]string{})
 	if _, err := loadConfig(); err == nil {
 		t.Fatal("expected an error when GDR_DATABASE_URL is unset")
+	}
+}
+
+func TestNotifyKind(t *testing.T) {
+	cases := []struct {
+		name  string
+		st    status
+		final bool
+		kind  string
+		ok    bool
+	}{
+		{"success", status{complete: true, updated: 10, skipped: 1}, false, "success", true},
+		{"success final attempt", status{complete: true, updated: 10}, true, "success", true},
+		{"only skipped games still counts as work", status{complete: true, skipped: 3}, false, "success", true},
+		{"already complete is silent", status{complete: true, alreadyComplete: true}, false, "", false},
+		{"no work is silent", status{complete: true}, false, "", false},
+		{"dry run success is silent", status{dryRun: true, complete: true, updated: 5}, false, "", false},
+		{"dry run failure is silent", status{dryRun: true}, true, "", false},
+		{"attempt failed", status{}, false, "attempt_failed", true},
+		{"final failed", status{}, true, "final_failed", true},
+	}
+	for _, c := range cases {
+		st := c.st
+		kind, ok := notifyKind(&st, c.final)
+		if kind != c.kind || ok != c.ok {
+			t.Errorf("%s: got %q %v", c.name, kind, ok)
+		}
+	}
+}
+
+func slackFixture(t *testing.T, status int) (*httptest.Server, *[]string) {
+	t.Helper()
+	var texts []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]string
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		texts = append(texts, body["text"])
+		w.WriteHeader(status)
+	}))
+	t.Cleanup(srv.Close)
+	return srv, &texts
+}
+
+func testNotifier(url string) notify.Notifier {
+	return notify.Notifier{URL: url, Client: http.DefaultClient, Timeout: time.Second, Retries: 1, Backoff: time.Millisecond}
+}
+
+func TestSendSlackPostsSuccessAndStaysSilentWhenNothingToSay(t *testing.T) {
+	srv, texts := slackFixture(t, 200)
+	plan := slot.Plan{Slot: time.Date(2026, 10, 10, 18, 30, 0, 0, time.UTC), Attempt: 1}
+	n := testNotifier(srv.URL)
+
+	sendSlack(context.Background(), n, &status{attempt: 1, complete: true, total: 10, updated: 9, skipped: 1, coverage: 1}, plan, time.Minute)
+	if len(*texts) != 1 || !strings.Contains((*texts)[0], "GameDeal Radar 00:00 IST / 18:30 UTC, 10 Oct complete. 10 games, 9 updated, 1 skipped") {
+		t.Fatalf("got %v", *texts)
+	}
+	sendSlack(context.Background(), n, &status{complete: true, alreadyComplete: true, total: 10}, plan, time.Second)
+	sendSlack(context.Background(), n, &status{dryRun: true, complete: true, updated: 3}, plan, time.Second)
+	if len(*texts) != 1 {
+		t.Fatalf("expected silence, got %v", *texts)
+	}
+}
+
+func TestSendSlackFailureIsHarmlessAndUnsetIsSilent(t *testing.T) {
+	srv, texts := slackFixture(t, 500)
+	plan := slot.Plan{Slot: time.Date(2026, 10, 10, 18, 30, 0, 0, time.UTC), Attempt: 6}
+	// Slack returns 500: must not panic or report anything back.
+	sendSlack(context.Background(), testNotifier(srv.URL), &status{attempt: 6, coverage: 0.5, total: 10, failed: 5}, plan, time.Second)
+	if len(*texts) != 2 || !strings.Contains((*texts)[0], "FAILED") {
+		t.Fatalf("got %v", *texts)
+	}
+	// Unset webhook: no request.
+	sendSlack(context.Background(), notify.Notifier{}, &status{attempt: 6}, plan, time.Second)
+	if len(*texts) != 2 {
+		t.Fatal("unexpected request")
 	}
 }
