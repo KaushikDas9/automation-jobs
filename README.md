@@ -20,7 +20,26 @@ projects/
 
 ## GameDeal Radar daily check
 
-Runs every day at 03:00 IST (21:30 UTC). For each active game it fetches the Steam
+Runs twice a day, timed to follow Steam's daily deal refresh (unverified: around
+10:00 AM Pacific, which is 18:00 UTC in winter or 17:00 UTC in summer):
+
+| Run | Cron (UTC) | IST | Notes |
+| --- | --- | --- | --- |
+| Morning | `30 18 * * *` | 00:00 | About 30 min after refresh in winter, about 90 min in summer |
+| Noon | `30 6 * * *` | 12:00 | Twelve hours after the first run |
+
+Each run takes roughly 11 minutes, so about 22 minutes a day in total (estimate, not
+measured yet). The `concurrency` group `gamedeal-radar-daily` with
+`cancel-in-progress: false` means a run never overlaps another: if one is still
+going when the next starts, the next waits in the queue.
+
+Scheduled runs are real writes. Only manual `workflow_dispatch` runs default to dry
+run. GitHub can also start scheduled runs 5 to 30 minutes late.
+
+To shift the times, edit both `cron` lines in
+`.github/workflows/gamedeal-radar-daily.yml`. Convert IST to UTC by subtracting 5h30m,
+and remember that Steam's refresh moves between 17:00 and 18:00 UTC with US daylight
+saving time, while GitHub cron does not. For each active game it fetches the Steam
 India (`cc=in`, INR) price at no more than 1 request per second, writes a price
 snapshot, updates the current-price row, and records a price event when the deal
 state changes. It is a port of the server's `ProcessPriceResult`. The differences
@@ -50,7 +69,7 @@ go vet ./... && go test ./...
    self-contained so it can build without the rest of the repo.
 2. Add `.github/workflows/<project-name>-<job>.yml`, modelled on
    `gamedeal-radar-daily.yml`:
-   - `on: schedule` with a cron expression, plus `workflow_dispatch` so you can run it
+   - `on: schedule` with a cron expression (or several), plus `workflow_dispatch` so you can run it
      by hand.
    - `permissions: contents: read` (the default for any new workflow).
    - A `concurrency` group unique to this job, with `cancel-in-progress: false`, so
@@ -76,8 +95,8 @@ across projects.
 
 GitHub cron expressions are always UTC, with five fields: `minute hour day month weekday`.
 
-- IST is UTC+5:30, so subtract 5h30m from IST to get UTC. 03:00 IST is 21:30 UTC the
-  previous day, which gives `30 21 * * *`.
+- IST is UTC+5:30, so subtract 5h30m from IST to get UTC. 00:00 IST is 18:30 UTC the
+  previous day, which gives `30 18 * * *`.
 - Scheduled runs can start late, sometimes by 10 to 30 minutes, when GitHub is busy.
   Do not schedule anything that must start at an exact time.
 - Scheduled runs use the default branch.

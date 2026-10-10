@@ -1,9 +1,20 @@
 name: GameDeal Radar daily price check
 
+# Schedule assumption (UNVERIFIED): Steam refreshes its deals around 10:00 AM
+# Pacific Time. That is 18:00 UTC in winter (PST, UTC-8) and 17:00 UTC in summer
+# (PDT, UTC-7). GitHub cron is UTC only and does not observe DST, so the two runs
+# below are fixed in UTC:
+#   "30 18 * * *"  18:30 UTC = 00:00 IST. About 30 min after the refresh in winter,
+#                  about 90 min after in summer.
+#   "30 6 * * *"   06:30 UTC = 12:00 IST. Twelve hours after the first run.
+# IST is UTC+5:30 with no DST. To convert IST to UTC, subtract 5h30m.
+# GitHub can start scheduled runs 5 to 30 minutes late under load, so do not rely
+# on an exact start time.
+
 on:
   schedule:
-    # 03:00 IST (UTC+5:30) is 21:30 UTC the previous day. GitHub cron is UTC.
-    - cron: "30 21 * * *"
+    - cron: "30 18 * * *"
+    - cron: "30 6 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -49,6 +60,13 @@ jobs:
       - name: Run daily check
         env:
           GDR_DATABASE_URL: ${{ secrets.GDR_DATABASE_URL }}
-          DRY_RUN: ${{ inputs.dry_run == true && '1' || '0' }}
-          LIMIT: ${{ inputs.limit }}
+          # Inputs exist only on workflow_dispatch. On schedule events
+          # github.event_name is "schedule", so the first clause is false and
+          # the expression yields '0' (a real write run, since only "1" or
+          # "true" enables dry run). A manual run uses inputs.dry_run, which
+          # defaults to true, and yields '1' unless the boolean is unticked.
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true && '1' || '0' }}
+          # On schedule the expression yields '' (no limit). On manual runs it
+          # passes the typed value, which is '' when left empty.
+          LIMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.limit || '' }}
         run: go run ./cmd/daily-check
