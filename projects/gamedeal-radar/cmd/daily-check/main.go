@@ -10,7 +10,8 @@
 //	RETRY_WAIT_1, RETRY_WAIT_2  waits before retry passes, Go durations (default 5m, 10m; "0" for tests).
 //	GDR_HEALTHCHECK_URL       dead man's switch URL. Optional. Never logged.
 //	GDR_HEALTHCHECK_FINAL_URL pinged with /fail on the final attempt's failure. Optional.
-//	GDR_SLACK_WEBHOOK_URL     Slack Incoming Webhook URL. Optional. Never logged.
+//	SLACK_WEBHOOK_URL         Slack Incoming Webhook URL, shared by all projects. Optional. Never logged.
+//	GDR_SLACK_WEBHOOK_URL     legacy fallback, read only when SLACK_WEBHOOK_URL is empty. Optional.
 //	GDR_NOTIFY_TEMPLATE_DIR   folder with success.tmpl, attempt_failed.tmpl, final_failed.tmpl
 //	                          to override the Slack message text. Optional.
 //	GITHUB_EVENT_NAME         set by Actions. "workflow_dispatch" marks a manual run.

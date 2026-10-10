@@ -1,5 +1,7 @@
 {{/*
 GameDeal Radar Slack messages. Slack mrkdwn is supported (*bold*, `code`, <url|label>).
+Every message starts with the project tag "[GameDeal Radar]" because one Slack channel is
+shared by all projects in the repository. Keep the tag first in any custom template too.
 
 Fields available in every template:
   {{.SlotLabel}}    slot start in IST and UTC, e.g. "00:00 IST / 18:30 UTC, 11 Oct"
@@ -18,13 +20,13 @@ named success.tmpl, attempt_failed.tmpl and final_failed.tmpl. Each file holds o
 message text. A missing or broken file falls back to the text below.
 */}}
 {{- define "success" -}}
-:white_check_mark: GameDeal Radar {{.SlotLabel}} complete. {{.Total}} games, {{.Updated}} updated, {{.Skipped}} skipped, {{.Retried}} retried, {{.CoveragePct}}% coverage ({{.Duration}}). {{.RunURL}}
+[GameDeal Radar] :white_check_mark: GameDeal Radar {{.SlotLabel}} complete. {{.Total}} games, {{.Updated}} updated, {{.Skipped}} skipped, {{.Retried}} retried, {{.CoveragePct}}% coverage ({{.Duration}}). {{.RunURL}}
 {{- end}}
 
 {{- define "attempt_failed" -}}
-:warning: GameDeal Radar {{.SlotLabel}} attempt {{.Attempt}} of 6 ended at {{.CoveragePct}}% coverage ({{.Failed}} of {{.Total}} games failed). The next attempt will retry. {{.RunURL}}
+[GameDeal Radar] :warning: GameDeal Radar {{.SlotLabel}} attempt {{.Attempt}} of 6 ended at {{.CoveragePct}}% coverage ({{.Failed}} of {{.Total}} games failed). The next attempt will retry. {{.RunURL}}
 {{- end}}
 
 {{- define "final_failed"}}
-:rotating_light: GameDeal Radar {{.SlotLabel}} FAILED after {{.Attempt}} attempts. Coverage {{.CoveragePct}}%, {{.Failed}} of {{.Total}} games failed. A GitHub issue was opened. {{.RunURL}}
+[GameDeal Radar] :rotating_light: GameDeal Radar {{.SlotLabel}} FAILED after {{.Attempt}} attempts. Coverage {{.CoveragePct}}%, {{.Failed}} of {{.Total}} games failed. A GitHub issue was opened. {{.RunURL}}
 {{- end}}

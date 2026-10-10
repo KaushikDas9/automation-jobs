@@ -5,7 +5,9 @@ Scheduled jobs for my projects, run on GitHub Actions instead of always-on serve
 Each project is self-contained. It lives in its own folder under `projects/<name>/`,
 with its own `go.mod`, README, and docs. Its workflow lives in `.github/workflows/`
 with a `<name>-` prefix, because GitHub only reads workflows from that folder. Projects
-share no code and no secrets. Every secret is prefixed with its project's name.
+share no code. Per-project secrets are prefixed with the project's name. The one
+exception is `SLACK_WEBHOOK_URL`, which every project shares because all of them post to
+one Slack channel.
 
 ## Projects
 
@@ -33,12 +35,16 @@ share no code and no secrets. Every secret is prefixed with its project's name.
 
 ## Secrets
 
-Names are `PROJECT_NAME_SECRET` in upper case, for example:
+Per-project secrets are named `PROJECT_NAME_SECRET` in upper case. Shared secrets have
+no prefix. For example:
 
-- `GDR_DATABASE_URL`, the GameDeal Radar database connection
-- `GDR_HEALTHCHECK_URL` and `GDR_HEALTHCHECK_FINAL_URL`, GameDeal Radar healthcheck URLs
-- `GDR_SLACK_WEBHOOK_URL`, optional Slack Incoming Webhook for GameDeal Radar run messages
-- `MYPROJ_API_TOKEN`, a placeholder for another project
+| Secret | Scope | Purpose |
+| --- | --- | --- |
+| `SLACK_WEBHOOK_URL` | shared by all projects, one channel | Optional Slack Incoming Webhook. Every project tags its messages with its own name, for example `[GameDeal Radar]`, so the channel stays readable. |
+| `GDR_DATABASE_URL` | GameDeal Radar | The GameDeal Radar database connection |
+| `GDR_HEALTHCHECK_URL` and `GDR_HEALTHCHECK_FINAL_URL` | GameDeal Radar | Healthcheck URLs |
+| `GDR_SLACK_WEBHOOK_URL` | GameDeal Radar | Optional fallback for the Slack webhook. Read only when `SLACK_WEBHOOK_URL` is empty. Can be removed once `SLACK_WEBHOOK_URL` is set. |
+| `MYPROJ_API_TOKEN` | placeholder for another project | Example of a project-prefixed secret |
 
 Give each project its own database role and credentials. Never share a super-user
 connection string.

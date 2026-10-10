@@ -81,6 +81,9 @@ jobs:
           GDR_DATABASE_URL: ${{ secrets.GDR_DATABASE_URL }}
           GDR_HEALTHCHECK_URL: ${{ secrets.GDR_HEALTHCHECK_URL }}
           GDR_HEALTHCHECK_FINAL_URL: ${{ secrets.GDR_HEALTHCHECK_FINAL_URL }}
+          # Shared by every project in the repo (one channel). GDR_SLACK_WEBHOOK_URL is
+          # the optional fallback, read only when SLACK_WEBHOOK_URL is empty.
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           GDR_SLACK_WEBHOOK_URL: ${{ secrets.GDR_SLACK_WEBHOOK_URL }}
           # Inputs exist only on workflow_dispatch. On schedule the first clause is
           # false, so DRY_RUN is '0' (real write) and LIMIT is '' (no limit).

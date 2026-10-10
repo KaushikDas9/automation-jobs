@@ -98,7 +98,14 @@ Optional. If the secret is not set, nothing is sent and nothing is logged about 
 2. Open **Incoming Webhooks**, switch it on, and choose **Add New Webhook to Workspace**.
    Pick the channel for the messages.
 3. Copy the webhook URL. In the GitHub repository open Settings, Secrets and variables,
-   Actions, and add a secret named `GDR_SLACK_WEBHOOK_URL` with that URL.
+   Actions, and add a secret named `SLACK_WEBHOOK_URL` with that URL. This secret is shared
+   by every project in the repository, because they all post to one channel.
+
+The workflow reads `SLACK_WEBHOOK_URL` first. If that is empty, it falls back to
+`GDR_SLACK_WEBHOOK_URL`, a project-specific secret that still works for existing setups.
+
+Every message starts with the tag `[GameDeal Radar]`, so messages from other projects in the
+same channel are easy to tell apart.
 
 The URL is a secret. Do not paste it into issues, commits, or chat. It is never logged,
 and it is removed from any error text.
@@ -122,7 +129,8 @@ The default text lives in `internal/notify/messages.tmpl`, which is compiled int
 program. To change the text without touching code, make a folder with any of
 `success.tmpl`, `attempt_failed.tmpl` and `final_failed.tmpl`, each holding only the
 message text, and point `GDR_NOTIFY_TEMPLATE_DIR` at it. A missing or broken file falls
-back to the default. Messages use Slack mrkdwn and Go `text/template` syntax. Fields:
+back to the default. Messages use Slack mrkdwn and Go `text/template` syntax. Keep the
+`[GameDeal Radar]` tag at the start of every message, because the channel is shared. Fields:
 
 | Field | Meaning |
 | --- | --- |
@@ -156,7 +164,8 @@ run that starts more than 6 hours after its slot start exits without fetching.
 | `RETRY_WAIT_2` | no | `10m` | Wait before the second retry pass. Go duration, `0` for tests. |
 | `GDR_HEALTHCHECK_URL` | no | none | Dead man's switch URL (secret). |
 | `GDR_HEALTHCHECK_FINAL_URL` | no | none | Second check URL (secret), pinged with `/fail` on the final attempt's failure. |
-| `GDR_SLACK_WEBHOOK_URL` | no | none | Slack Incoming Webhook URL (secret). Unset means no Slack messages. |
+| `SLACK_WEBHOOK_URL` | no | none | Slack Incoming Webhook URL (secret), shared by all projects. Unset means no Slack messages. |
+| `GDR_SLACK_WEBHOOK_URL` | no | none | Fallback Slack webhook URL (secret), read only when `SLACK_WEBHOOK_URL` is empty. |
 | `GDR_NOTIFY_TEMPLATE_DIR` | no | none | Folder with `success.tmpl`, `attempt_failed.tmpl`, `final_failed.tmpl` to override message text. |
 
 ## Set up the healthchecks.io checks

@@ -71,7 +71,7 @@ func TestSuccessPostsExpectedText(t *testing.T) {
 	if err := fast(srv.URL).Send(context.Background(), Success, sample()); err != nil {
 		t.Fatal(err)
 	}
-	want := ":white_check_mark: GameDeal Radar 00:00 IST / 18:30 UTC, 10 Oct complete. 500 games, 480 updated, 18 skipped, 20 retried, 99.6% coverage (7m12s). https://github.com/o/r/actions/runs/1"
+	want := "[GameDeal Radar] :white_check_mark: GameDeal Radar 00:00 IST / 18:30 UTC, 10 Oct complete. 500 games, 480 updated, 18 skipped, 20 retried, 99.6% coverage (7m12s). https://github.com/o/r/actions/runs/1"
 	if got["text"] != want {
 		t.Fatalf("got %q\nwant %q", got["text"], want)
 	}
@@ -86,6 +86,55 @@ func TestAllDefaultTemplatesRender(t *testing.T) {
 		if err != nil || out == "" || strings.Contains(out, "{{") {
 			t.Fatalf("%s: %q %v", k, out, err)
 		}
+		if !strings.HasPrefix(out, "[GameDeal Radar] ") {
+			t.Fatalf("%s: missing project tag: %q", k, out)
+		}
+	}
+}
+
+func envOf(m map[string]string) func(string) string {
+	return func(k string) string { return m[k] }
+}
+
+func TestWebhookEnvOrder(t *testing.T) {
+	cases := []struct {
+		name string
+		env  map[string]string
+		want string
+	}{
+		{"shared only", map[string]string{"SLACK_WEBHOOK_URL": "https://hooks/shared"}, "https://hooks/shared"},
+		{"legacy only", map[string]string{"GDR_SLACK_WEBHOOK_URL": "https://hooks/legacy"}, "https://hooks/legacy"},
+		{"shared wins", map[string]string{"SLACK_WEBHOOK_URL": "https://hooks/shared", "GDR_SLACK_WEBHOOK_URL": "https://hooks/legacy"}, "https://hooks/shared"},
+		{"empty shared falls back", map[string]string{"SLACK_WEBHOOK_URL": "", "GDR_SLACK_WEBHOOK_URL": "https://hooks/legacy"}, "https://hooks/legacy"},
+		{"blank shared falls back", map[string]string{"SLACK_WEBHOOK_URL": "   ", "GDR_SLACK_WEBHOOK_URL": "https://hooks/legacy"}, "https://hooks/legacy"},
+		{"both empty", map[string]string{"SLACK_WEBHOOK_URL": "", "GDR_SLACK_WEBHOOK_URL": ""}, ""},
+		{"neither set", map[string]string{}, ""},
+		{"shared is trimmed", map[string]string{"SLACK_WEBHOOK_URL": "  https://hooks/shared \n"}, "https://hooks/shared"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			n := New(envOf(c.env))
+			if n.URL != c.want {
+				t.Fatalf("URL %q, want %q", n.URL, c.want)
+			}
+			if n.Enabled() != (c.want != "") {
+				t.Fatalf("Enabled %v for URL %q", n.Enabled(), n.URL)
+			}
+		})
+	}
+}
+
+func TestSharedWebhookPostsMessage(t *testing.T) {
+	var hits int32
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { atomic.AddInt32(&hits, 1) }))
+	defer srv.Close()
+	n := New(envOf(map[string]string{"SLACK_WEBHOOK_URL": srv.URL}))
+	n.Backoff = time.Millisecond
+	if err := n.Send(context.Background(), AttemptFailed, sample()); err != nil {
+		t.Fatal(err)
+	}
+	if atomic.LoadInt32(&hits) != 1 {
+		t.Fatalf("hits %d", hits)
 	}
 }
 

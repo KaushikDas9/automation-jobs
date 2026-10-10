@@ -76,11 +76,28 @@ type Notifier struct {
 	Logf        func(msg string, err error) // optional warning sink; never receives the URL
 }
 
+// WebhookEnv is the shared Slack webhook variable. One channel serves every project in
+// the repository, so this is the name to use.
+const WebhookEnv = "SLACK_WEBHOOK_URL"
+
+// LegacyWebhookEnv is the project-specific name. It is read only when WebhookEnv is empty.
+const LegacyWebhookEnv = "GDR_SLACK_WEBHOOK_URL"
+
+// webhookURL returns SLACK_WEBHOOK_URL, falling back to GDR_SLACK_WEBHOOK_URL when the
+// first is empty or whitespace. The value is never logged.
+func webhookURL(getenv func(string) string) string {
+	if u := strings.TrimSpace(getenv(WebhookEnv)); u != "" {
+		return u
+	}
+	return strings.TrimSpace(getenv(LegacyWebhookEnv))
+}
+
 // New returns a Notifier with production defaults (10s timeout, one retry after 2s)
-// configured from GDR_SLACK_WEBHOOK_URL and GDR_NOTIFY_TEMPLATE_DIR.
+// configured from SLACK_WEBHOOK_URL (or the legacy GDR_SLACK_WEBHOOK_URL) and
+// GDR_NOTIFY_TEMPLATE_DIR.
 func New(getenv func(string) string) Notifier {
 	return Notifier{
-		URL:         strings.TrimSpace(getenv("GDR_SLACK_WEBHOOK_URL")),
+		URL:         webhookURL(getenv),
 		TemplateDir: strings.TrimSpace(getenv("GDR_NOTIFY_TEMPLATE_DIR")),
 		Client:      &http.Client{Timeout: 15 * time.Second},
 		Timeout:     10 * time.Second,
