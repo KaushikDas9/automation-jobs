@@ -1,0 +1,155 @@
+name: Slack GitHub notify
+
+# Posts GitHub activity to the shared Slack channel using the SLACK_WEBHOOK_URL secret.
+# Event values (titles, comment bodies, branch names) only reach the script through the
+# env block below, and the script reads them as data. Nothing from github.event is
+# pasted into the script text. Commit messages are read from the event payload file
+# (GITHUB_EVENT_PATH) because a large push can be too big for a single env var.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, reopened, ready_for_review, closed]
+  issues:
+    types: [opened, closed, reopened]
+  issue_comment:
+    types: [created]
+  release:
+    types: [published]
+  workflow_run:
+    workflows: ["GameDeal Radar daily price check"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    name: Post to Slack
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: >-
+      (github.event_name != 'issue_comment' || github.event.comment.user.type != 'Bot') &&
+      (github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.name != 'Slack GitHub notify'))
+    steps:
+      - name: Build and send the Slack message
+        env:
+          PROJECT_NAME: Automation Jobs
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          EVENT_NAME: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          ACTOR: ${{ github.actor }}
+          REF_NAME: ${{ github.ref_name }}
+          COMPARE_URL: ${{ github.event.compare }}
+          PUSH_DELETED: ${{ github.event.deleted }}
+          PUSH_SIZE: ${{ github.event.size }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
+          PR_BASE: ${{ github.event.pull_request.base.ref }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_IS_PR: ${{ github.event.issue.pull_request != null }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_URL: ${{ github.event.comment.html_url }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
+          RUN_NAME: ${{ github.event.workflow_run.name }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          set -uo pipefail
+
+          if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
+            echo "Slack webhook not configured, skipping"
+            exit 0
+          fi
+
+          tag="[${PROJECT_NAME}]"
+
+          # Collapse whitespace, cut to $2 characters, escape Slack's &, < and >.
+          # The text is passed to jq as data and is never run as code.
+          clip() {
+            jq -rn --arg s "${1:-}" --argjson n "$2" '
+              ($s | gsub("\\s+"; " ") | sub("^ "; "") | sub(" $"; "")) as $t
+              | (if ($t | length) > $n then $t[0:$n] + "..." else $t end)
+              | gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;")'
+          }
+
+          # First line of up to 5 commits, each cut to 100 characters, read from the payload file.
+          commit_lines() {
+            jq -r --argjson n 5 '
+              def esc: gsub("&"; "&amp;") | gsub("<"; "&lt;") | gsub(">"; "&gt;");
+              (.commits // [])[0:$n][]
+              | "• `\(.id[0:7])` " + (((.message // "") | split("\n")[0] | gsub("\\s+"; " "))
+                  | (if length > 100 then .[0:100] + "..." else . end) | esc)
+            ' "$GITHUB_EVENT_PATH"
+          }
+
+          case "${EVENT_NAME:-}" in
+            push)
+              if [ "${PUSH_DELETED:-}" = "true" ]; then
+                text=":wastebasket: ${tag} Branch $(clip "$REF_NAME" 100) deleted by $(clip "$ACTOR" 100)"
+              else
+                text=":rocket: ${tag} ${PUSH_SIZE:-0} commit(s) pushed to $(clip "$REF_NAME" 100) by $(clip "$ACTOR" 100)"
+                commits="$(commit_lines)"
+                if [ -n "$commits" ]; then text+=$'\n'"$commits"; fi
+                if [ -n "${COMPARE_URL:-}" ]; then text+=$'\n'"<${COMPARE_URL}|View changes>"; fi
+              fi
+              ;;
+            pull_request)
+              title="$(clip "${PR_TITLE:-}" 200)"
+              case "${ACTION:-}" in
+                opened)
+                  text=":twisted_rightwards_arrows: ${tag} PR #${PR_NUMBER} opened by $(clip "$ACTOR" 100): ${title} <${PR_URL}|view>" ;;
+                reopened)
+                  text=":twisted_rightwards_arrows: ${tag} PR #${PR_NUMBER} reopened by $(clip "$ACTOR" 100): ${title} <${PR_URL}|view>" ;;
+                ready_for_review)
+                  text=":eyes: ${tag} PR #${PR_NUMBER} ready for review by $(clip "$ACTOR" 100): ${title} <${PR_URL}|view>" ;;
+                closed)
+                  if [ "${PR_MERGED:-}" = "true" ]; then
+                    text=":twisted_rightwards_arrows: ${tag} PR #${PR_NUMBER} merged into $(clip "$PR_BASE" 100) by $(clip "$ACTOR" 100): ${title} <${PR_URL}|view>"
+                  else
+                    text=":no_entry_sign: ${tag} PR #${PR_NUMBER} closed without merging by $(clip "$ACTOR" 100): ${title} <${PR_URL}|view>"
+                  fi ;;
+                *) echo "Unhandled pull_request action ${ACTION:-}, skipping"; exit 0 ;;
+              esac
+              ;;
+            issues)
+              title="$(clip "${ISSUE_TITLE:-}" 200)"
+              text=":memo: ${tag} Issue #${ISSUE_NUMBER} ${ACTION:-} by $(clip "$ACTOR" 100): ${title} <${ISSUE_URL}|view>"
+              ;;
+            issue_comment)
+              if [ "${ISSUE_IS_PR:-}" = "true" ]; then kind="PR"; else kind="issue"; fi
+              body="$(clip "${COMMENT_BODY:-}" 200)"
+              text=":speech_balloon: ${tag} New comment on ${kind} #${ISSUE_NUMBER} by $(clip "$COMMENT_AUTHOR" 100): ${body} <${COMMENT_URL}|view>"
+              ;;
+            release)
+              name="$(clip "${RELEASE_NAME:-${RELEASE_TAG:-}}" 200)"
+              text=":package: ${tag} Release $(clip "$RELEASE_TAG" 100) published by $(clip "$ACTOR" 100): ${name} <${RELEASE_URL}|view>"
+              ;;
+            workflow_run)
+              if [ "${RUN_CONCLUSION:-}" != "failure" ]; then
+                echo "Run concluded ${RUN_CONCLUSION:-}, not a failure, skipping"
+                exit 0
+              fi
+              text=":x: ${tag} workflow $(clip "$RUN_NAME" 100) failed on $(clip "$RUN_BRANCH" 100) <${RUN_URL}|view run>"
+              ;;
+            *)
+              echo "Unhandled event ${EVENT_NAME:-}, skipping"
+              exit 0
+              ;;
+          esac
+
+          payload="$(jq -n --arg text "$text" '{text: $text}')"
+          curl --silent --show-error --max-time 10 --fail-with-body \
+            --header 'Content-Type: application/json' \
+            --data "$payload" \
+            "$SLACK_WEBHOOK_URL" > /dev/null
+          echo "Slack message sent for ${EVENT_NAME:-} event"

@@ -93,6 +93,17 @@ they never open a failure issue. Start with a dry run after any change.
   (see the project README), and pings the optional final healthcheck.
 - When a later slot completes, the open `job-failure` issues are closed with a comment.
 
+## GitHub activity notifications
+
+`.github/workflows/slack-notify.yml` posts to the shared Slack channel when something
+happens on GitHub. It covers pushes to `main`, pull requests (opened, reopened, ready for
+review, merged, closed), issues (opened, closed, reopened), new comments on issues and
+pull requests (bots are skipped), published releases, and failed runs of the GameDeal
+Radar job. Every message starts with `[Automation Jobs]`. The workflow needs the
+`SLACK_WEBHOOK_URL` secret in each repository that uses it, including this one. Without
+the secret, the job logs "Slack webhook not configured, skipping" and passes. Set it with
+`gh secret set SLACK_WEBHOOK_URL`.
+
 ## Security rules
 
 - No secrets, passwords, tokens, or real connection strings in the repository, commit
