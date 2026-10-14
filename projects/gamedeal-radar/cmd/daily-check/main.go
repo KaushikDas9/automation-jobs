@@ -41,6 +41,7 @@ import (
 	"gamedeal-radar/daily-check/internal/run"
 	"gamedeal-radar/daily-check/internal/slot"
 	"gamedeal-radar/daily-check/internal/steam"
+	"gamedeal-radar/daily-check/internal/usd"
 )
 
 // runBudget matches the workflow's timeout-minutes. Retry waits stop early enough to leave
@@ -278,7 +279,10 @@ func execute(ctx context.Context, cfg config, plan slot.Plan, deadline time.Time
 		return 1
 	}
 
-	res, err := run.Execute(ctx, db.NewRepo(conn, steamID), steam.NewClient(steam.DefaultConfig()), run.Options{
+	repo := db.NewRepo(conn, steamID)
+	client := steam.NewClient(steam.DefaultConfig())
+
+	res, err := run.Execute(ctx, repo, client, run.Options{
 		SteamStoreID: steamID,
 		SlotStart:    plan.Slot,
 		DryRun:       cfg.dryRun,
@@ -300,6 +304,18 @@ func execute(ctx context.Context, cfg config, plan slot.Plan, deadline time.Time
 	st.skipped = res.Skipped
 	st.retried = res.Retried
 	printSummary(res, cfg.dryRun)
+
+	// The USD pass is best effort: its outcome never changes the INR result or the exit code.
+	usdRes, usdErr := usd.Execute(ctx, repo, client, usd.Options{
+		SlotStart: plan.Slot,
+		DryRun:    cfg.dryRun,
+		Limit:     cfg.limit,
+	})
+	if usdErr != nil {
+		slog.Warn("usd pass aborted", "error", usdErr)
+	}
+	fmt.Printf("usd summary dry_run=%t missing=%d saved=%d unavailable=%d failed=%d\n",
+		cfg.dryRun, usdRes.Missing, usdRes.Saved, usdRes.Unavailable, usdRes.Failed)
 
 	if !run.Succeeded(res.CoverageAfter) {
 		slog.Error("coverage below threshold for this attempt",

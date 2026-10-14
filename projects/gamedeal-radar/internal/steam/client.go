@@ -95,6 +95,17 @@ func (c *Client) FetchPrice(ctx context.Context, appID, countryCode string) (*Pr
 	endpoint := fmt.Sprintf("%s/appdetails?appids=%s&cc=%s&filters=basic,price_overview",
 		c.cfg.BaseURL, url.QueryEscape(appID), url.QueryEscape(countryCode))
 
+	body, err := c.getBody(ctx, endpoint, appID)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAppDetails(appID, countryCode, body, time.Now())
+}
+
+// getBody GETs endpoint through the rate limiter and returns the response body. label
+// only names the request in logs and errors. It retries transient failures (network,
+// 429, 5xx) with backoff; permanent failures return immediately.
+func (c *Client) getBody(ctx context.Context, endpoint, label string) ([]byte, error) {
 	var lastErr error
 	for attempt := 0; attempt <= c.cfg.MaxRetries; attempt++ {
 		if err := c.limiter.Wait(ctx); err != nil {
@@ -113,8 +124,8 @@ func (c *Client) FetchPrice(ctx context.Context, appID, countryCode string) (*Pr
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
 			}
-			lastErr = transient(fmt.Errorf("executing http request for app %s: %w", appID, err))
-			slog.Warn("steam request network error, retrying", "app_id", appID, "attempt", attempt)
+			lastErr = transient(fmt.Errorf("executing http request for %s: %w", label, err))
+			slog.Warn("steam request network error, retrying", "request", label, "attempt", attempt)
 			if err := sleepCtx(ctx, c.backoff(attempt)); err != nil {
 				return nil, err
 			}
@@ -124,7 +135,7 @@ func (c *Client) FetchPrice(ctx context.Context, appID, countryCode string) (*Pr
 		if resp.StatusCode == http.StatusTooManyRequests {
 			_ = resp.Body.Close()
 			wait := c.backoff(attempt)
-			slog.Warn("steam rate limit hit (HTTP 429), pausing", "app_id", appID, "pause", wait.String())
+			slog.Warn("steam rate limit hit (HTTP 429), pausing", "request", label, "pause", wait.String())
 			c.limiter.Pause(wait)
 			lastErr = ErrRateLimited
 			continue
@@ -133,7 +144,7 @@ func (c *Client) FetchPrice(ctx context.Context, appID, countryCode string) (*Pr
 		if resp.StatusCode != http.StatusOK {
 			_ = resp.Body.Close()
 			statusErr := &StatusError{Code: resp.StatusCode}
-			slog.Warn("steam api non-200 status", "app_id", appID, "status", resp.StatusCode)
+			slog.Warn("steam api non-200 status", "request", label, "status", resp.StatusCode)
 			if !IsTransient(statusErr) {
 				return nil, statusErr
 			}
@@ -149,11 +160,10 @@ func (c *Client) FetchPrice(ctx context.Context, appID, countryCode string) (*Pr
 		if err != nil {
 			return nil, transient(fmt.Errorf("reading steam response body: %w", err))
 		}
-
-		return ParseAppDetails(appID, countryCode, body, time.Now())
+		return body, nil
 	}
 
-	return nil, fmt.Errorf("steam price check failed after %d retries: %w", c.cfg.MaxRetries, lastErr)
+	return nil, fmt.Errorf("steam request %s failed after %d retries: %w", label, c.cfg.MaxRetries, lastErr)
 }
 
 // backoff returns exponential backoff for attempt with 0-25% jitter, capped at MaxBackoff.
