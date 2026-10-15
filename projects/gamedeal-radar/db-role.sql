@@ -55,6 +55,14 @@ GRANT INSERT ON price_events TO gdr_daily_job;
 --    SELECT is required for ON CONFLICT ... DO UPDATE on the game_id conflict target.
 GRANT SELECT, INSERT, UPDATE ON game_current_price TO gdr_daily_job;
 
+-- 7. Steam store details (weekly details-check) and USD prices (daily USD pass).
+--    Requires migration 000005 (game_details_and_usd_prices) in the GameDealRader repo. game_details and
+--    game_current_price_usd are upserted, so they need SELECT, INSERT and UPDATE.
+--    game_usd_snapshots is append-only history.
+GRANT SELECT, INSERT, UPDATE ON game_details TO gdr_daily_job;
+GRANT SELECT, INSERT, UPDATE ON game_current_price_usd TO gdr_daily_job;
+GRANT SELECT, INSERT ON game_usd_snapshots TO gdr_daily_job;
+
 -- Rows use gen_random_uuid() defaults, so no sequence grants are needed.
 
 -- Optional, after reviewing: keep the password out of logs and shell history.

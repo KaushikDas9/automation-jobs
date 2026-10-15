@@ -1,0 +1,68 @@
+name: GameDeal Radar weekly game details
+
+# Refreshes the Steam store details (description, genres, screenshots, requirements) of
+# games whose details are missing or older than STALE_DAYS (default 6). Each game is saved
+# on its own, so the second run later on the same day resumes anything the first did not
+# finish and does nothing when everything is fresh. GitHub cron is UTC only.
+# 02:00 UTC is 07:30 IST on Sunday; 08:00 UTC is 13:30 IST.
+
+on:
+  schedule:
+    - cron: "0 2 * * 0"
+    - cron: "0 8 * * 0"
+  workflow_dispatch:
+    # Manual runs default to dry run. Untick dry_run to write data.
+    inputs:
+      dry_run:
+        description: "Fetch details but write nothing to the database"
+        type: boolean
+        default: true
+      limit:
+        description: "Max games to fetch (leave empty for all)"
+        type: string
+        required: false
+        default: ""
+      force:
+        description: "Refresh every game, even if fetched recently"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gamedeal-radar-details
+  cancel-in-progress: false
+
+jobs:
+  details:
+    name: Steam game details refresh
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    defaults:
+      run:
+        working-directory: projects/gamedeal-radar
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache-dependency-path: projects/gamedeal-radar/go.sum
+
+      - name: Build and test
+        run: |
+          go vet ./...
+          go test ./...
+
+      - name: Refresh game details
+        env:
+          GDR_DATABASE_URL: ${{ secrets.GDR_DATABASE_URL }}
+          # Inputs exist only on workflow_dispatch. On schedule the first clause is
+          # false, so DRY_RUN is '0' (real write), LIMIT is '' (no limit) and FORCE is '0'.
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true && '1' || '0' }}
+          LIMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.limit || '' }}
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force == true && '1' || '0' }}
+        run: go run ./cmd/details-check
