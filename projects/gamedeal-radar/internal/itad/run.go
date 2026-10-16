@@ -8,15 +8,15 @@ import (
 	"gamedeal-radar/daily-check/internal/storeprices"
 )
 
-// API is the ITAD surface the Epic run uses. Client implements it; tests use fakes.
+// API is the price API surface the Epic run uses. Client implements it; tests use fakes.
 type API interface {
 	Lookup(ctx context.Context, title string) (LookupResult, error)
 	Prices(ctx context.Context, ids []string, country string) (map[string]Deal, error)
 	EpicLinks(ctx context.Context, ids []string) (map[string]string, error)
 }
 
-// epicRegions maps each stored region to the ITAD country code and the currency that
-// ITAD must return for it.
+// epicRegions maps each stored region to the provider's country code and the currency that
+// the provider must return for it.
 var epicRegions = []struct {
 	Region   string
 	Country  string
@@ -37,7 +37,7 @@ type priceJob struct {
 	matches []match
 }
 
-// RunEpic looks every working game up on ITAD, reads the Epic (shop 16) price for India
+// RunEpic looks every working game up on the provider, reads the Epic (shop 16) price for India
 // and the US, and saves the rows. The stages are: lookup (strict title rule), batched price
 // requests per country, then batched Epic link lookups. A game is failed only when one of
 // its requests still fails after the retry passes; nothing is written for a failed game.
@@ -88,25 +88,25 @@ func RunEpic(ctx context.Context, repo storeprices.Repo, api API, o storeprices.
 			switch {
 			case storeprices.IsBlocked(err):
 				sum.Blocked = true
-				slog.Warn("itad blocked the request, stopping the run", "error", err)
+				slog.Warn("price API blocked the request, stopping the run", "error", err)
 				return storeprices.Stop
 			case storeprices.IsTransient(err):
-				slog.Warn("itad lookup failed (transient), will retry", "game", g.Name, "error", err)
+				slog.Warn("price API lookup failed (transient), will retry", "game", g.Name, "error", err)
 				return storeprices.Retry
 			default:
 				failed[g.ID] = true
-				slog.Warn("itad lookup failed, nothing written", "game", g.Name, "error", err)
+				slog.Warn("price API lookup failed, nothing written", "game", g.Name, "error", err)
 				return storeprices.Done
 			}
 		}
 		if !res.Found {
 			sum.NoMatch++
-			slog.Info("no itad match, skipped", "game", g.Name)
+			slog.Info("no provider match, skipped", "game", g.Name)
 			return storeprices.Done
 		}
 		if !MatchTitle(g.Name, res) {
 			sum.TitleMismatch++
-			slog.Info("itad title differs after normalization, skipped", "game", g.Name, "itad_title", res.Title)
+			slog.Info("provider title differs after normalization, skipped", "game", g.Name, "itad_title", res.Title)
 			return storeprices.Done
 		}
 		matches = append(matches, match{game: g, itadID: res.ID})
@@ -134,14 +134,14 @@ func RunEpic(ctx context.Context, repo storeprices.Repo, api API, o storeprices.
 			switch {
 			case storeprices.IsBlocked(err):
 				sum.Blocked = true
-				slog.Warn("itad blocked the price request, stopping the run", "error", err)
+				slog.Warn("price API blocked the price request, stopping the run", "error", err)
 				return storeprices.Stop
 			case storeprices.IsTransient(err):
-				slog.Warn("itad price request failed (transient), will retry", "country", j.country, "games", len(j.matches), "error", err)
+				slog.Warn("price API price request failed (transient), will retry", "country", j.country, "games", len(j.matches), "error", err)
 				return storeprices.Retry
 			default:
 				markMatchesFailed(failed, j.matches)
-				slog.Warn("itad price request failed, nothing written for its games", "country", j.country, "games", len(j.matches), "error", err)
+				slog.Warn("price API price request failed, nothing written for its games", "country", j.country, "games", len(j.matches), "error", err)
 				return storeprices.Done
 			}
 		}
@@ -168,14 +168,14 @@ func RunEpic(ctx context.Context, repo storeprices.Repo, api API, o storeprices.
 			switch {
 			case storeprices.IsBlocked(err):
 				sum.Blocked = true
-				slog.Warn("itad blocked the link request, stopping the run", "error", err)
+				slog.Warn("price API blocked the link request, stopping the run", "error", err)
 				return storeprices.Stop
 			case storeprices.IsTransient(err):
-				slog.Warn("itad link request failed (transient), will retry", "games", len(ms), "error", err)
+				slog.Warn("price API link request failed (transient), will retry", "games", len(ms), "error", err)
 				return storeprices.Retry
 			default:
 				markMatchesFailed(failed, ms)
-				slog.Warn("itad link request failed, nothing written for its games", "games", len(ms), "error", err)
+				slog.Warn("price API link request failed, nothing written for its games", "games", len(ms), "error", err)
 				return storeprices.Done
 			}
 		}
@@ -265,7 +265,7 @@ func finishEpic(sum storeprices.Summary, games []storeprices.Game, failed map[st
 	return sum
 }
 
-// epicStoreURL returns the Epic page when ITAD gave a readable slug, otherwise the search link.
+// epicStoreURL returns the Epic page when the provider gave a readable slug, otherwise the search link.
 func epicStoreURL(name, rawLink string) (string, bool) {
 	if u, ok := EpicPageURL(rawLink); ok {
 		return u, true

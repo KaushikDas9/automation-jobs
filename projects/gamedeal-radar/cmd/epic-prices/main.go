@@ -1,11 +1,11 @@
-// Command epic-prices reads Epic Games Store prices through IsThereAnyDeal (ITAD) for every
+// Command epic-prices reads Epic Games Store prices through the price data provider for every
 // active game and stores them (store_code 'epic') in game_store_prices. Epic itself is never
-// called. ITAD's deal URLs are never read or stored.
+// called. The provider's deal URLs are never read or stored.
 //
 // Environment:
 //
 //	GDR_DATABASE_URL          Postgres connection string. Required. Never logged.
-//	ITAD_API_KEY              IsThereAnyDeal API key. Required. Never logged.
+//	ITAD_API_KEY              API key for the price data provider. Required. Never logged.
 //	DRY_RUN                   "1" or "true" fetches and prints, and writes nothing.
 //	LIMIT                     max games in this run (testing). Coverage is counted over them.
 //	RETRY_WAIT_1, RETRY_WAIT_2  waits before retry passes, Go durations (default 1m, 2m; "0" for tests).
@@ -18,7 +18,7 @@
 //	GITHUB_OUTPUT             set by Actions. Receives flags for the workflow.
 //
 // Exit codes: 0 done (at least 90% of games handled, or already complete), 1 below 90%,
-// ITAD refused the run (401, 403, or 429 twice), the run was cut short, or the database was
+// The price API refused the run (401, 403, or 429 twice), the run was cut short, or the database was
 // unreachable. 2 configuration error.
 package main
 
@@ -124,7 +124,7 @@ func runOnce() int {
 	}
 
 	jobrun.Finish(ctx, jobrun.Report{
-		Job:             "Epic prices (via ITAD)",
+		Job:             "Epic prices",
 		Code:            code,
 		DryRun:          cfg.dryRun,
 		AlreadyComplete: sum.AlreadyComplete,

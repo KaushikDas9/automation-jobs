@@ -1,5 +1,5 @@
 // Package storeprices holds the pieces shared by the store price jobs (GOG and Epic
-// through IsThereAnyDeal, plus the USD to INR rate): the row type, title matching,
+// through the price data provider, plus the USD to INR rate): the row type, title matching,
 // money helpers, sanity checks, HTTP plumbing, timed retry passes and the run
 // orchestration. Parsing functions are pure so they can be tested without network
 // or database access.
