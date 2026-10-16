@@ -244,7 +244,7 @@ func newTestClient(t *testing.T, h http.HandlerFunc) (*Client, *httptest.Server)
 	t.Helper()
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	return &Client{Fetcher: storeprices.NewFetcher(0), BaseURL: srv.URL, APIKey: testKey}, srv
+	return &Client{Fetcher: newFetcher(0), BaseURL: srv.URL, APIKey: testKey}, srv
 }
 
 func TestClientSendsKeyUserAgentAndBatchBody(t *testing.T) {
@@ -268,7 +268,7 @@ func TestClientSendsKeyUserAgentAndBatchBody(t *testing.T) {
 	if !strings.Contains(got.query, "country=IN") || !strings.Contains(got.query, "shops=16") {
 		t.Fatalf("query = %q", got.query)
 	}
-	if got.key != testKey || got.ua != "GameDealRadar-jobs/1.0" || got.ct != "application/json" {
+	if got.key != testKey || got.ua != UserAgent || got.ct != "application/json" {
 		t.Fatalf("headers: key_ok=%t ua=%q ct=%q", got.key == testKey, got.ua, got.ct)
 	}
 	var ids []string
