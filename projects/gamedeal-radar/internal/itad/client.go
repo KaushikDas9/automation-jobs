@@ -45,11 +45,22 @@ type Client struct {
 	APIKey  string
 }
 
+// UserAgent names this job to ITAD. It says what the program is, a daily store price job,
+// and carries no project name, so a project rename never touches it. It is not a browser name.
+const UserAgent = "PriceTrackerJob/1.0 (daily store price job)"
+
+// newFetcher is the shared HTTP fetcher with this job's own User-Agent.
+func newFetcher(gap time.Duration) *storeprices.Fetcher {
+	f := storeprices.NewFetcher(gap)
+	f.UserAgent = UserAgent
+	return f
+}
+
 // NewClient returns a client with the production base URL and request gap.
 // The gap of 500 ms caps the job at 2 requests per second.
 func NewClient(apiKey string) *Client {
 	return &Client{
-		Fetcher: storeprices.NewFetcher(500 * time.Millisecond),
+		Fetcher: newFetcher(500 * time.Millisecond),
 		BaseURL: DefaultBaseURL,
 		APIKey:  apiKey,
 	}
