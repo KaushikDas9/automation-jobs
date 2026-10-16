@@ -267,7 +267,7 @@ Rules for this job:
   also guards every row with `WHERE game_store_prices.source <> 'manual'`.
 - **Provider credit.** The provider's API terms ask for it to be credited wherever its data is
   shown. Check the current terms before showing this data on the site, and put the credit line
-  the terms require next to Epic prices. This README does not restate the
+  the terms ask for next to Epic prices. This README does not restate the
   exact wording of the terms.
 - **Rate.** At most 2 requests per second, which keeps the job far below the provider's limit of
   1000 requests per 5 minutes. A `429` is retried once after its `Retry-After` (capped at

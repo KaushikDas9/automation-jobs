@@ -2,7 +2,7 @@ name: GameDeal Radar Epic price check
 
 # Reads the Epic Games Store price of every active game through the price data provider and
 # stores it in game_store_prices (store 'epic'). Epic itself is never called, and the provider's deal
-# URLs are never read or stored. Requires the ITAD_API_KEY secret. The provider requires credit
+# URLs are never read or stored. Requires the ITAD_API_KEY secret. The provider asks for credit
 # for its data; see the README of projects/gamedeal-radar.
 # Two runs a day: the main run and a backup (already-complete check as for GOG).
 # GitHub cron is UTC only. IST has no DST, so these times never shift.
