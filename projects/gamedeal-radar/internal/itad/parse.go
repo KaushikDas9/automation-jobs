@@ -31,7 +31,7 @@ type lookupResponse struct {
 func ParseLookup(body []byte) (LookupResult, error) {
 	var resp lookupResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
-		return LookupResult{}, fmt.Errorf("decoding itad lookup: %w", err)
+		return LookupResult{}, fmt.Errorf("decoding price API lookup: %w", err)
 	}
 	if !resp.Found || resp.Game == nil || resp.Game.ID == "" {
 		return LookupResult{Found: false}, nil
@@ -53,7 +53,7 @@ func MatchTitle(ourName string, r LookupResult) bool {
 	return storeprices.NormalizeTitle(r.Title) == want
 }
 
-// Deal is the Epic (shop 16) deal of one ITAD game in one country.
+// Deal is the Epic (shop 16) deal of one provider game in one country.
 // Amounts are in cents. Nil means the amount was missing or unreadable.
 type Deal struct {
 	ID              string
@@ -75,9 +75,9 @@ type pricesDeal struct {
 	} `json:"shop"`
 	Price   *money `json:"price"`
 	Regular *money `json:"regular"`
-	// Timestamp is the time ITAD last saw this deal.
+	// Timestamp is the time the provider last saw this deal.
 	Timestamp string `json:"timestamp"`
-	// The deal URL is deliberately not decoded: it is ITAD's tracked redirect.
+	// The deal URL is deliberately not decoded: it is the provider's tracked redirect.
 }
 
 type money struct {
@@ -91,7 +91,7 @@ type money struct {
 func ParsePrices(body []byte, country string) (map[string]Deal, error) {
 	var entries []pricesEntry
 	if err := json.Unmarshal(body, &entries); err != nil {
-		return nil, fmt.Errorf("decoding itad prices (%s): %w", country, err)
+		return nil, fmt.Errorf("decoding price API prices (%s): %w", country, err)
 	}
 	out := make(map[string]Deal, len(entries))
 	for _, e := range entries {
@@ -155,13 +155,13 @@ func centsOf(amount *float64) *int64 {
 	return &c
 }
 
-// ParseShopLinks reads a /lookup/shop/16/id/v1 response: {"<itadId>": ["<slug>", "<offer id>"]}.
+// ParseShopLinks reads a /lookup/shop/16/id/v1 response: {"<id>": ["<slug>", "<offer id>"]}.
 // The value may be missing, null or empty. Each id maps to the first element, or to ""
 // when there is none.
 func ParseShopLinks(body []byte) (map[string]string, error) {
 	var raw map[string][]string
 	if err := json.Unmarshal(body, &raw); err != nil {
-		return nil, fmt.Errorf("decoding itad shop lookup: %w", err)
+		return nil, fmt.Errorf("decoding price API shop lookup: %w", err)
 	}
 	out := make(map[string]string, len(raw))
 	for id, vals := range raw {
@@ -201,7 +201,7 @@ func EpicSearchURL(name string) string {
 
 // PriceFromDeal turns an Epic deal into a game_store_prices row. Status is 'ok', or
 // 'free' when the current price is zero. The discount is computed here, not taken from
-// ITAD. The reason is non-empty when the deal cannot be used at all.
+// the provider. The reason is non-empty when the deal cannot be used at all.
 func PriceFromDeal(d Deal, region, storeURL string) (storeprices.Price, string) {
 	if d.RegularCurrency != "" && d.Currency != "" && d.RegularCurrency != d.Currency {
 		return storeprices.Price{}, "regular and current currencies differ"

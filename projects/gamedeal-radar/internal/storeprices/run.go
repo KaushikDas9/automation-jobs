@@ -75,9 +75,9 @@ type Summary struct {
 	KeptManual      int            // rows left alone because a manual row exists
 	SkippedManual   int            // games skipped entirely because they have a manual row
 	SkippedSanity   int            // rows skipped by a sanity check
-	NoMatch         int            // Epic: games with no IsThereAnyDeal match
+	NoMatch         int            // Epic: games with no provider match
 	TitleMismatch   int            // Epic: matches rejected by the strict title rule
-	Matched         int            // Epic: games matched to IsThereAnyDeal
+	Matched         int            // Epic: games matched to the provider
 	WithPrice       map[string]int // region -> games with a usable price row
 	NoPrice         map[string]int // region -> matched games with no Epic deal (Epic)
 	NotListed       map[string]int // region -> games the store does not list (GOG)

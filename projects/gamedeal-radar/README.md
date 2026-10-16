@@ -210,7 +210,7 @@ Steam jobs are not changed by them.
 | --- | --- | --- | --- | --- |
 | USD to INR rate | `cmd/fx-rate` | `gamedeal-radar-fx-rate.yml` | 02:30 daily | 08:00 daily |
 | GOG prices (US and IN) | `cmd/gog-prices` | `gamedeal-radar-gog-prices.yml` | 03:00 main, 07:00 backup | 08:30 main, 12:30 backup |
-| Epic prices (via ITAD) | `cmd/epic-prices` | `gamedeal-radar-epic-prices.yml` | 04:00 main, 08:00 backup | 09:30 main, 13:30 backup |
+| Epic prices | `cmd/epic-prices` | `gamedeal-radar-epic-prices.yml` | 04:00 main, 08:00 backup | 09:30 main, 13:30 backup |
 
 Each job is also available as a manual run (`workflow_dispatch`). Manual runs default to
 dry run, so nothing is written unless you untick `dry_run`.
@@ -237,39 +237,39 @@ is stored as `listed_no_price`. The discount is computed by the job.
   active games already have a `gog` row checked in the last 20 hours, it prints
   `already complete` and exits 0 without fetching. Manual runs and dry runs skip this check.
 
-### Epic prices through IsThereAnyDeal (`cmd/epic-prices`)
+### Epic prices (`cmd/epic-prices`)
 
-Epic is read through IsThereAnyDeal (ITAD), `https://api.isthereanydeal.com`. Epic itself
+Epic is read through the price data provider's API, `https://api.isthereanydeal.com`. Epic itself
 is never called by this job. Flow:
 
 1. **Lookup.** Each active game is looked up by its name. A match is accepted only when the
-   normalized ITAD title equals the normalized game name. Normalization lowercases the text,
+   normalized provider title equals the normalized game name. Normalization lowercases the text,
    removes `™ ® ©` and apostrophes, turns other punctuation into spaces, and collapses spaces.
-   No fuzzy matching. The ITAD id is used for the next steps and is never stored.
+   No fuzzy matching. The provider's id is used for the next steps and is never stored.
 2. **Prices.** The matched ids go in batches of at most 200, once for `country=IN` and once
    for `country=US`, with `shops=16` (Epic). Only Epic deals are kept. The price is stored
-   in the currency ITAD returns, which must be `INR` for IN and `USD` for US. The discount is
-   computed by the job, not taken from ITAD.
-3. **Link.** One batch call to ITAD's Epic lookup gives the Epic address part. It is used only
+   in the currency the provider returns, which must be `INR` for IN and `USD` for US. The discount is
+   computed by the job, not taken from the provider.
+3. **Link.** One batch call to the provider's Epic lookup gives the Epic address part. It is used only
    if it is a readable slug (`^[a-z0-9][a-z0-9-]{1,120}$`) and not a 32-character hex id. Then
    the link is `https://store.epicgames.com/en-US/p/<slug>`. Otherwise the link is an Epic
    search link: `https://store.epicgames.com/en-US/browse?q=<name>&sortBy=relevancy&sortDir=DESC&count=40`.
 4. **Write.** Rows are `store_code epic`, `source auto`, with `source_updated_at` set to the
    deal's timestamp. A game with no Epic deal in a region gets no row for that region, and
-   an old row is left as it is. Games with no ITAD match get nothing.
+   an old row is left as it is. Games with no provider match get nothing.
 
 Rules for this job:
 
-- **ITAD deal URLs are never read or stored.** They are ITAD's tracked redirects, with ITAD's
+- **Provider deal URLs are never read or stored.** They are the provider's tracked redirects, with its
   affiliate tag. The job decodes only the amount, currency, and timestamp.
 - **Manual rows are never touched.** A game that has any `source = manual` Epic row is skipped
   entirely: no lookup, and neither its price nor its link is written. The write statement
   also guards every row with `WHERE game_store_prices.source <> 'manual'`.
-- **ITAD credit.** ITAD's API terms ask for IsThereAnyDeal to be credited wherever its data is
-  shown. Check the current terms before showing this data on the site, and put a credit line
-  such as "Prices via IsThereAnyDeal" next to Epic prices. This README does not restate the
+- **Provider credit.** The provider's API terms ask for it to be credited wherever its data is
+  shown. Check the current terms before showing this data on the site, and put the credit line
+  the terms ask for next to Epic prices. This README does not restate the
   exact wording of the terms.
-- **Rate.** At most 2 requests per second, which keeps the job far below ITAD's limit of
+- **Rate.** At most 2 requests per second, which keeps the job far below the provider's limit of
   1000 requests per 5 minutes. A `429` is retried once after its `Retry-After` (capped at
   120 seconds). A second `429`, or a `401` or `403`, stops the run and sets `blocked=true`.
 - **Retries and coverage.** Retry passes work as for GOG. A failed batch writes nothing for
@@ -281,7 +281,7 @@ Rules for this job:
 
 - **Coverage.** A run succeeds (exit 0) when at least 90% of the games in the run were handled.
   A game is handled when its rows were written, when it was skipped on purpose (a manual row,
-  or no ITAD match), or when it had no error. A game that still fails after the retries counts
+  or no provider match), or when it had no error. A game that still fails after the retries counts
   as failed. An interrupted run (blocked, or cut short by the deadline) counts as 0% covered.
 - **Jump check.** A price more than 80% away from the stored price for the same game and
   region is not written. It is logged as `price jumped more than 80%`, and the stored row stays.
@@ -291,7 +291,7 @@ Rules for this job:
   Base price must be at least the current price. The currency must be the expected one. A
   failing row is skipped and logged, and the rest of the game is still written.
 - **Not stored.** Nothing from a store's API is stored except the fields listed above. No
-  ITAD ids, no ITAD URLs, no raw payloads.
+  provider ids, no provider URLs, no raw payloads.
 
 ### Exit codes (store jobs)
 
@@ -306,7 +306,7 @@ Rules for this job:
 | Name | Used by | Required | Default | Meaning |
 | --- | --- | --- | --- | --- |
 | `GDR_DATABASE_URL` | all | yes | none | Postgres connection string, from the `gdr_daily_job` role. Never logged. |
-| `ITAD_API_KEY` | epic-prices | yes | none | IsThereAnyDeal API key (GitHub secret `ITAD_API_KEY`). Never logged. |
+| `ITAD_API_KEY` | epic-prices | yes | none | API key for the price data provider (GitHub secret `ITAD_API_KEY`). Never logged. |
 | `DRY_RUN` | all | no | `0` | `1` fetches and prints, and writes nothing. Manual runs default to `1`. |
 | `LIMIT` | gog, epic | no | none | Maximum games in this run. Coverage is counted over these games. For testing. |
 | `RETRY_WAIT_1` | gog, epic | no | `1m` | Wait before the first retry pass. `0` for tests. |
@@ -322,7 +322,7 @@ Rules for this job:
 The three workflows use the existing secrets `GDR_DATABASE_URL`, `SLACK_WEBHOOK_URL` and
 `GDR_SLACK_WEBHOOK_URL`, plus one new one:
 
-- **`ITAD_API_KEY`** (new). Create an IsThereAnyDeal API key in your ITAD account, then add it
+- **`ITAD_API_KEY`** (new). Create an API key with the price data provider, then add it
   as a repository secret. It is used only by the Epic workflow.
 
 The store workflows do not set the health-check secrets on purpose. The Steam daily job's

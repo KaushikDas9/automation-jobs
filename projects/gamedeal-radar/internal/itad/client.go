@@ -1,5 +1,5 @@
-// Package itad reads Epic Games Store prices through IsThereAnyDeal (ITAD). Epic itself is
-// never called. ITAD's deal URLs are ITAD's tracked redirects with ITAD's affiliate tag,
+// Package itad reads Epic Games Store prices through the price data provider's API. Epic itself is
+// never called. The provider's deal URLs are its tracked redirects with its affiliate tag,
 // so the job never reads, stores or links them. Only the price amounts, currency and
 // timestamp are kept.
 //
@@ -22,13 +22,13 @@ import (
 	"gamedeal-radar/daily-check/internal/storeprices"
 )
 
-// DefaultBaseURL is the ITAD API root.
+// DefaultBaseURL is the price data provider's API root.
 const DefaultBaseURL = "https://api.isthereanydeal.com"
 
-// EpicShopID is ITAD's shop id for the Epic Games Store.
+// EpicShopID is the provider's shop id for the Epic Games Store.
 const EpicShopID = 16
 
-// MaxIDsPerRequest is ITAD's batch size limit used by this job.
+// MaxIDsPerRequest is the provider's batch size limit used by this job.
 const MaxIDsPerRequest = 200
 
 // maxRetryAfter caps how long a Retry-After header may make the job wait.
@@ -37,15 +37,15 @@ const maxRetryAfter = 120 * time.Second
 // keyHeader is the auth header. Its value is never logged or put in an error.
 const keyHeader = "ITAD-API-Key"
 
-// Client calls ITAD. It makes at most one request per Interval (the production value keeps
-// the job far below ITAD's 1000 requests per 5 minutes).
+// Client calls the price API. It makes at most one request per Interval (the production value keeps
+// the job far below the provider's 1000 requests per 5 minutes).
 type Client struct {
 	Fetcher *storeprices.Fetcher
 	BaseURL string
 	APIKey  string
 }
 
-// UserAgent names this job to ITAD. It says what the program is, a daily store price job,
+// UserAgent names this job to the provider. It says what the program is, a daily store price job,
 // and carries no project name, so a project rename never touches it. It is not a browser name.
 const UserAgent = "PriceTrackerJob/1.0 (daily store price job)"
 
@@ -82,7 +82,7 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 	if body != nil {
 		b, err := json.Marshal(body)
 		if err != nil {
-			return nil, fmt.Errorf("encoding itad request: %w", err)
+			return nil, fmt.Errorf("encoding price API request: %w", err)
 		}
 		payload = b
 	}
@@ -114,10 +114,10 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 				}
 				continue
 			}
-			return nil, fmt.Errorf("itad %s: rate limited twice: %w", path, storeprices.ErrBlocked)
+			return nil, fmt.Errorf("price API %s: rate limited twice: %w", path, storeprices.ErrBlocked)
 		}
 		if resp.Status != http.StatusOK {
-			return nil, storeprices.StatusError(resp.Status, "itad "+path)
+			return nil, storeprices.StatusError(resp.Status, "price API "+path)
 		}
 		return resp.Body, nil
 	}
@@ -136,7 +136,7 @@ func retryAfter(h http.Header) time.Duration {
 	return 30 * time.Second
 }
 
-// Lookup asks ITAD for the game with exactly this title. The caller applies the strict
+// Lookup asks the provider for the game with exactly this title. The caller applies the strict
 // title rule with MatchTitle.
 func (c *Client) Lookup(ctx context.Context, title string) (LookupResult, error) {
 	q := url.Values{}
@@ -161,7 +161,7 @@ func (c *Client) Prices(ctx context.Context, ids []string, country string) (map[
 	return ParsePrices(body, country)
 }
 
-// EpicLinks returns, per ITAD id, the raw first element of ITAD's Epic lookup (the
+// EpicLinks returns, per provider id, the raw first element of the provider's Epic lookup (the
 // address part). Use EpicPageURL to decide whether it can be used.
 func (c *Client) EpicLinks(ctx context.Context, ids []string) (map[string]string, error) {
 	q := url.Values{}
