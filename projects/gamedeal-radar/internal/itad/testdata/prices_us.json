@@ -1,0 +1,17 @@
+[
+  {
+    "id": "018d937e-3a5c-7b2a-9d4e-0f5a1c2b3d4e",
+    "historyLow": {"all": {"amount": 9.99, "currency": "USD"}},
+    "deals": [
+      {
+        "shop": {"id": 16, "name": "Epic Game Store"},
+        "price": {"amount": 17.99, "currency": "USD"},
+        "regular": {"amount": 59.99, "currency": "USD"},
+        "cut": 70,
+        "timestamp": "2026-10-13T18:30:00Z",
+        "expiry": null,
+        "url": "https://isthereanydeal.com/redirect/example-epic-us-tracked"
+      }
+    ]
+  }
+]

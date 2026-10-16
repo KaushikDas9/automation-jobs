@@ -1,0 +1,56 @@
+[
+  {
+    "id": "018d937e-3a5c-7b2a-9d4e-0f5a1c2b3d4e",
+    "historyLow": {"all": {"amount": 299.0, "currency": "INR"}},
+    "deals": [
+      {
+        "shop": {"id": 61, "name": "GOG"},
+        "price": {"amount": 1049.0, "currency": "INR"},
+        "regular": {"amount": 2999.0, "currency": "INR"},
+        "cut": 65,
+        "timestamp": "2026-10-14T09:12:00+00:00",
+        "expiry": null,
+        "url": "https://isthereanydeal.com/redirect/example-gog-tracked"
+      },
+      {
+        "shop": {"id": 16, "name": "Epic Game Store"},
+        "price": {"amount": 1199.5, "currency": "INR"},
+        "regular": {"amount": 2999.0, "currency": "INR"},
+        "cut": 60,
+        "timestamp": "2026-10-13T18:30:00+00:00",
+        "expiry": "2026-10-20T15:00:00+00:00",
+        "url": "https://isthereanydeal.com/redirect/example-epic-tracked"
+      }
+    ]
+  },
+  {
+    "id": "018d937e-8888-7000-8000-000000000002",
+    "historyLow": {"all": {"amount": 0, "currency": "INR"}},
+    "deals": [
+      {
+        "shop": {"id": 16, "name": "Epic Game Store"},
+        "price": {"amount": 0, "currency": "INR"},
+        "regular": {"amount": 499.0, "currency": "INR"},
+        "cut": 100,
+        "timestamp": "2026-10-12T12:00:00+00:00",
+        "expiry": "2026-10-19T15:00:00+00:00",
+        "url": "https://isthereanydeal.com/redirect/example-free-tracked"
+      }
+    ]
+  },
+  {
+    "id": "018d937e-9999-7000-8000-000000000003",
+    "historyLow": {"all": null},
+    "deals": [
+      {
+        "shop": {"id": 61, "name": "GOG"},
+        "price": {"amount": 500.0, "currency": "INR"},
+        "regular": {"amount": 900.0, "currency": "INR"},
+        "cut": 44,
+        "timestamp": "2026-10-13T00:00:00+00:00",
+        "expiry": null,
+        "url": "https://isthereanydeal.com/redirect/example-gog-only"
+      }
+    ]
+  }
+]

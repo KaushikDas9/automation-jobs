@@ -1,0 +1,50 @@
+{
+  "pages": 1,
+  "productCount": 4,
+  "products": [
+    {
+      "id": "2093619782",
+      "slug": "cyberpunk_2077_ultimate_edition",
+      "title": "Cyberpunk 2077: Ultimate Edition",
+      "storeLink": "https://www.gog.com/en/game/cyberpunk_2077_ultimate_edition",
+      "price": {
+        "final": "$31.99",
+        "base": "$79.99",
+        "discount": "-60%",
+        "finalMoney": {"amount": "31.99", "currency": "USD", "discount": "48.00"},
+        "baseMoney": {"amount": "79.99", "currency": "USD"}
+      }
+    },
+    {
+      "id": "2093619700",
+      "slug": "cyberpunk_2077",
+      "title": "Cyberpunk 2077",
+      "storeLink": "https://www.gog.com/en/game/cyberpunk_2077",
+      "price": {
+        "final": "$10.55",
+        "base": "$35.20",
+        "discount": "-70%",
+        "finalMoney": {"amount": "10.55", "currency": "USD", "discount": "24.65"},
+        "baseMoney": {"amount": "35.20", "currency": "USD"}
+      }
+    },
+    {
+      "id": "1200001",
+      "slug": "free_test_game",
+      "title": "Free Test Game",
+      "storeLink": "https://www.gog.com/en/game/free_test_game",
+      "price": {
+        "final": "$0.00",
+        "base": "$0.00",
+        "finalMoney": {"amount": "0", "currency": "USD"},
+        "baseMoney": {"amount": "0", "currency": "USD"}
+      }
+    },
+    {
+      "id": "1200002",
+      "slug": "no_price_game",
+      "title": "No Price Game",
+      "storeLink": "https://www.gog.com/en/game/no_price_game"
+    }
+  ]
+}

@@ -199,3 +199,177 @@ go vet ./... && go test -race ./...
 ```
 
 Tests use no network and no database.
+
+## Store price jobs (GOG, Epic, USD to INR)
+
+Three more jobs run next to the Steam jobs. They share the same database role and the same
+Slack and healthcheck setup, but they are separate programs with their own workflows. The
+Steam jobs are not changed by them.
+
+| Job | Command | Workflow | Schedule (UTC) | Schedule (IST) |
+| --- | --- | --- | --- | --- |
+| USD to INR rate | `cmd/fx-rate` | `gamedeal-radar-fx-rate.yml` | 02:30 daily | 08:00 daily |
+| GOG prices (US and IN) | `cmd/gog-prices` | `gamedeal-radar-gog-prices.yml` | 03:00 main, 07:00 backup | 08:30 main, 12:30 backup |
+| Epic prices (via ITAD) | `cmd/epic-prices` | `gamedeal-radar-epic-prices.yml` | 04:00 main, 08:00 backup | 09:30 main, 13:30 backup |
+
+Each job is also available as a manual run (`workflow_dispatch`). Manual runs default to
+dry run, so nothing is written unless you untick `dry_run`.
+
+### USD to INR rate (`cmd/fx-rate`)
+
+Fetches the rate from Frankfurter (`https://api.frankfurter.dev/v1/latest?base=USD&symbols=INR`)
+and stores it in `fx_rates` as pair `USD_INR`. The rate must be between 40 and 200. Any
+failure writes nothing and exits 1. There is one request per run and no retries.
+
+### GOG prices (`cmd/gog-prices`)
+
+For every active game, looks up the exact title on GOG's public catalog. GOG returns both
+countries in USD, so the job asks for `US` and `IN` and stores both as `store_code gog`.
+A title that does not match exactly is stored as `not_listed`. A listed game with no price
+is stored as `listed_no_price`. The discount is computed by the job.
+
+- One request per second to GOG, with the User-Agent `GameDealRadar-jobs/1.0`.
+- A `429`, `401` or `403` stops the run at once (exit 1, flag `blocked=true`).
+- A `5xx` or network error retries that game in a retry pass. The waits are `RETRY_WAIT_1`
+  (default 1m) and `RETRY_WAIT_2` (default 2m). A game that still fails gets nothing written.
+- Both regions of a game are written in one transaction.
+- Every scheduled run checks the database first. If at least 90% of
+  active games already have a `gog` row checked in the last 20 hours, it prints
+  `already complete` and exits 0 without fetching. Manual runs and dry runs skip this check.
+
+### Epic prices through IsThereAnyDeal (`cmd/epic-prices`)
+
+Epic is read through IsThereAnyDeal (ITAD), `https://api.isthereanydeal.com`. Epic itself
+is never called by this job. Flow:
+
+1. **Lookup.** Each active game is looked up by its name. A match is accepted only when the
+   normalized ITAD title equals the normalized game name. Normalization lowercases the text,
+   removes `™ ® ©` and apostrophes, turns other punctuation into spaces, and collapses spaces.
+   No fuzzy matching. The ITAD id is used for the next steps and is never stored.
+2. **Prices.** The matched ids go in batches of at most 200, once for `country=IN` and once
+   for `country=US`, with `shops=16` (Epic). Only Epic deals are kept. The price is stored
+   in the currency ITAD returns, which must be `INR` for IN and `USD` for US. The discount is
+   computed by the job, not taken from ITAD.
+3. **Link.** One batch call to ITAD's Epic lookup gives the Epic address part. It is used only
+   if it is a readable slug (`^[a-z0-9][a-z0-9-]{1,120}$`) and not a 32-character hex id. Then
+   the link is `https://store.epicgames.com/en-US/p/<slug>`. Otherwise the link is an Epic
+   search link: `https://store.epicgames.com/en-US/browse?q=<name>&sortBy=relevancy&sortDir=DESC&count=40`.
+4. **Write.** Rows are `store_code epic`, `source auto`, with `source_updated_at` set to the
+   deal's timestamp. A game with no Epic deal in a region gets no row for that region, and
+   an old row is left as it is. Games with no ITAD match get nothing.
+
+Rules for this job:
+
+- **ITAD deal URLs are never read or stored.** They are ITAD's tracked redirects, with ITAD's
+  affiliate tag. The job decodes only the amount, currency, and timestamp.
+- **Manual rows are never touched.** A game that has any `source = manual` Epic row is skipped
+  entirely: no lookup, and neither its price nor its link is written. The write statement
+  also guards every row with `WHERE game_store_prices.source <> 'manual'`.
+- **ITAD credit.** ITAD's API terms ask for IsThereAnyDeal to be credited wherever its data is
+  shown. Check the current terms before showing this data on the site, and put a credit line
+  such as "Prices via IsThereAnyDeal" next to Epic prices. This README does not restate the
+  exact wording of the terms.
+- **Rate.** At most 2 requests per second, which keeps the job far below ITAD's limit of
+  1000 requests per 5 minutes. A `429` is retried once after its `Retry-After` (capped at
+  120 seconds). A second `429`, or a `401` or `403`, stops the run and sets `blocked=true`.
+- **Retries and coverage.** Retry passes work as for GOG. A failed batch writes nothing for
+  its games.
+- **Secret.** The API key comes from the `ITAD_API_KEY` environment variable. It is sent only
+  in the `ITAD-API-Key` header, and it is never logged or printed.
+
+### Shared rules for the store jobs
+
+- **Coverage.** A run succeeds (exit 0) when at least 90% of the games in the run were handled.
+  A game is handled when its rows were written, when it was skipped on purpose (a manual row,
+  or no ITAD match), or when it had no error. A game that still fails after the retries counts
+  as failed. An interrupted run (blocked, or cut short by the deadline) counts as 0% covered.
+- **Jump check.** A price more than 80% away from the stored price for the same game and
+  region is not written. It is logged as `price jumped more than 80%`, and the stored row stays.
+  This protects against a bad response. It also means a real very large change (for example
+  a 90% sale) is held back until someone checks it. Review the logged skips.
+- **Sanity checks.** A priced row must have a price above zero, unless its status is `free`.
+  Base price must be at least the current price. The currency must be the expected one. A
+  failing row is skipped and logged, and the rest of the game is still written.
+- **Not stored.** Nothing from a store's API is stored except the fields listed above. No
+  ITAD ids, no ITAD URLs, no raw payloads.
+
+### Exit codes (store jobs)
+
+| Code | Meaning |
+| --- | --- |
+| 0 | Coverage is at least 90%, or the run was already complete, or (fx) the rate was stored |
+| 1 | Coverage below 90%, the store blocked the run, the run was cut short, the database was unreachable, or the rate could not be fetched or stored |
+| 2 | Configuration error (for example a missing `GDR_DATABASE_URL` or `ITAD_API_KEY`, or a bad `LIMIT`) |
+
+### Environment variables (store jobs)
+
+| Name | Used by | Required | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `GDR_DATABASE_URL` | all | yes | none | Postgres connection string, from the `gdr_daily_job` role. Never logged. |
+| `ITAD_API_KEY` | epic-prices | yes | none | IsThereAnyDeal API key (GitHub secret `ITAD_API_KEY`). Never logged. |
+| `DRY_RUN` | all | no | `0` | `1` fetches and prints, and writes nothing. Manual runs default to `1`. |
+| `LIMIT` | gog, epic | no | none | Maximum games in this run. Coverage is counted over these games. For testing. |
+| `RETRY_WAIT_1` | gog, epic | no | `1m` | Wait before the first retry pass. `0` for tests. |
+| `RETRY_WAIT_2` | gog, epic | no | `2m` | Wait before the second retry pass. `0` for tests. |
+| `FINAL_ATTEMPT` | all | no | `0` | Set by the workflow on the last scheduled run of the day. A failure then sets `final_attempt=true` for the issue step. |
+| `GDR_HEALTHCHECK_URL` | all | no | none | Dead man's switch URL (secret). Not set by the store workflows. |
+| `GDR_HEALTHCHECK_FINAL_URL` | all | no | none | Pinged with `/fail` on a failing final run (secret). |
+| `SLACK_WEBHOOK_URL` | all | no | none | Shared Slack webhook (secret). See the Slack section above. |
+| `GDR_SLACK_WEBHOOK_URL` | all | no | none | Fallback Slack webhook, read only when `SLACK_WEBHOOK_URL` is empty. |
+
+### GitHub secrets (store jobs)
+
+The three workflows use the existing secrets `GDR_DATABASE_URL`, `SLACK_WEBHOOK_URL` and
+`GDR_SLACK_WEBHOOK_URL`, plus one new one:
+
+- **`ITAD_API_KEY`** (new). Create an IsThereAnyDeal API key in your ITAD account, then add it
+  as a repository secret. It is used only by the Epic workflow.
+
+The store workflows do not set the health-check secrets on purpose. The Steam daily job's
+health check is a dead man's switch, and a GOG or Epic ping on the same URL would hide a Steam
+outage. To add a check per job later, create a separate secret for each job and add it to that
+workflow's env.
+
+### Failure issues (store jobs)
+
+Only the last scheduled run of the day can open an issue: the 08:00 UTC run for Epic, the
+07:00 UTC run for GOG, and the 02:30 UTC run for the rate. Each job has its own title, so
+they never close each other's issues. An open issue with the same title is not duplicated.
+A later successful run closes it.
+
+### Database role (store jobs)
+
+See `db-role.sql`, section 8 and 9. The job role needs `SELECT, INSERT, UPDATE` on
+`game_store_prices` and on `fx_rates`. It has no `DELETE`. The store jobs also need
+migrations `000007` and `000009` from the GameDealRader repo.
+
+## Steam tags job (`cmd/steam-tags`)
+
+A weekly job stores each game's top Steam user tags in `game_details.tags`. It is separate
+from the other jobs and uses no key. The workflow is `gamedeal-radar-steam-tags.yml`, on
+Sunday at 05:00 UTC (10:30 IST), with a manual run that defaults to dry run.
+
+- **Source.** Steam's public store API. The tag names come from `IStoreService/GetTagList`
+  once per run (English). The tags of each game come from `IStoreBrowseService/GetItems`,
+  in batches of 50 app ids, for the US store, with at most 10 tags per game, most popular
+  first. Each stored tag is `{"id": "<tagid>", "description": "<name>"}`.
+- **Games.** Active games that have a `game_details` row and a numeric Steam app id.
+- **Writes.** Only `game_details.tags`, one `UPDATE` per game, never a delete. A game
+  that Steam returns no usable tags for is left as it is, so an empty list never replaces
+  tags it already has. A dry run writes nothing.
+- **Rate and retries.** One request per second with the User-Agent `GameDealRadar/1.0 (tags
+  job)`. A `429` or `5xx` is retried with a doubling wait (5s, 10s, 20s), and `Retry-After` is
+  honoured up to 60 seconds. A `401` or `403`, or a `429` that does not clear, stops the run.
+  A batch that still fails is counted as failed, and the other batches go on.
+- **Coverage.** The run succeeds (exit 0) when at least 90% of the games were handled. A
+  game with no tags counts as handled. A failed game does not. A stopped run exits 1.
+- **No healthcheck.** This job reads no `GDR_HEALTHCHECK_*` variables. Its only Slack
+  message is the success or failure line, and the failure issue opens only on the scheduled
+  run.
+- **Limit.** `LIMIT=n` caps the games in a run, for testing.
+- **Database role.** Needs only `UPDATE` on `game_details`, already granted in
+  `db-role.sql` section 7.
+
+Exit codes: 0 stored (or dry run fetched) with 90% coverage, 1 the tag list or games could
+not be read, Steam refused, the run was cut short, a write failed, or coverage was below
+90%, 2 configuration error.
