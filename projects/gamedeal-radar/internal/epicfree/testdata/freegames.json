@@ -1,0 +1,397 @@
+{
+  "data": {
+    "Catalog": {
+      "searchStore": {
+        "paging": {
+          "count": 8,
+          "total": 8
+        },
+        "elements": [
+          {
+            "title": "Ember Ridge",
+            "id": "a1f0c3e27b9d4e8f9c2a51d7e0b4c6a1",
+            "namespace": "5d2b8e1f0a7c4b3d9e6f1a2b3c4d5e6f",
+            "description": "Race a hovercraft across a burning canyon.",
+            "effectiveDate": "2026-10-15T15:00:00.000Z",
+            "offerType": "BASE_GAME",
+            "expiryDate": null,
+            "status": "ACTIVE",
+            "isCodeRedemptionOnly": false,
+            "keyImages": [
+              {
+                "type": "Thumbnail",
+                "url": "https://cdn.example-store.test/ember-ridge/thumbnail.jpg"
+              },
+              {
+                "type": "OfferImageWide",
+                "url": "https://cdn.example-store.test/ember-ridge/offer-wide.jpg"
+              },
+              {
+                "type": "DieselStoreFrontWide",
+                "url": "https://cdn.example-store.test/ember-ridge/storefront-wide.jpg"
+              }
+            ],
+            "seller": {
+              "id": "o-1111aaaa2222bbbb3333cccc4444dddd",
+              "name": "Example Studio"
+            },
+            "productSlug": "ember-ridge",
+            "urlSlug": "ember-ridge",
+            "url": null,
+            "items": [
+              {
+                "id": "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7",
+                "namespace": "5d2b8e1f0a7c4b3d9e6f1a2b3c4d5e6f"
+              }
+            ],
+            "customAttributes": [],
+            "categories": [
+              {
+                "path": "games"
+              }
+            ],
+            "catalogNs": {
+              "mappings": [
+                {
+                  "pageType": "productHome",
+                  "pageSlug": "ember-ridge"
+                }
+              ]
+            },
+            "price": {
+              "totalPrice": {
+                "discountPrice": 0,
+                "originalPrice": 149900,
+                "voucherDiscount": 0,
+                "discount": 149900,
+                "currencyCode": "INR",
+                "currencyInfo": {
+                  "decimals": 2
+                },
+                "fmtPrice": {
+                  "originalPrice": "1,499.00",
+                  "discountPrice": "0.00",
+                  "intermediatePrice": "0.00"
+                }
+              },
+              "lineOffers": []
+            },
+            "promotions": {
+              "promotionalOffers": [
+                {
+                  "promotionalOffers": [
+                    {
+                      "startDate": "2026-10-15T15:00:00.000Z",
+                      "endDate": "2026-10-22T15:00:00.000Z",
+                      "discountSetting": {
+                        "discountType": "PERCENTAGE",
+                        "discountPercentage": 0
+                      }
+                    }
+                  ]
+                }
+              ],
+              "upcomingPromotionalOffers": []
+            }
+          },
+          {
+            "title": "Starfall Tactics",
+            "id": "c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8",
+            "namespace": "5d2b8e1f0a7c4b3d9e6f1a2b3c4d5e6f",
+            "description": "Turn-based command of a fleet in a shrinking galaxy.",
+            "effectiveDate": "2026-10-22T15:00:00.000Z",
+            "offerType": "BASE_GAME",
+            "status": "ACTIVE",
+            "keyImages": [
+              {
+                "type": "OfferImageWide",
+                "url": "http://cdn.example-store.test/starfall/offer-wide.jpg"
+              },
+              {
+                "type": "Thumbnail",
+                "url": "https://cdn.example-store.test/starfall/thumbnail.jpg"
+              }
+            ],
+            "productSlug": "c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8",
+            "urlSlug": "starfall-tactics",
+            "catalogNs": {
+              "mappings": [
+                {
+                  "pageType": "productHome",
+                  "pageSlug": "c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8"
+                }
+              ]
+            },
+            "price": {
+              "totalPrice": {
+                "discountPrice": 0,
+                "originalPrice": 1999,
+                "currencyCode": "INR",
+                "currencyInfo": {
+                  "decimals": 2
+                }
+              }
+            },
+            "promotions": {
+              "promotionalOffers": [],
+              "upcomingPromotionalOffers": [
+                {
+                  "promotionalOffers": [
+                    {
+                      "startDate": "2026-10-22T15:00:00.000Z",
+                      "endDate": "2026-10-29T15:00:00.000Z",
+                      "discountSetting": {
+                        "discountType": "PERCENTAGE",
+                        "discountPercentage": 0
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "title": "Paper Harbor",
+            "id": "d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9",
+            "namespace": "5d2b8e1f0a7c4b3d9e6f1a2b3c4d5e6f",
+            "keyImages": [
+              {
+                "type": "OfferImageWide",
+                "url": "https://cdn.example-store.test/paper-harbor/offer-wide.jpg"
+              }
+            ],
+            "productSlug": "paper-harbor",
+            "urlSlug": "paper-harbor",
+            "catalogNs": {
+              "mappings": [
+                {
+                  "pageType": "productHome",
+                  "pageSlug": "paper-harbor"
+                }
+              ]
+            },
+            "price": {
+              "totalPrice": {
+                "discountPrice": 49900,
+                "originalPrice": 74900,
+                "currencyCode": "INR",
+                "currencyInfo": {
+                  "decimals": 2
+                }
+              }
+            },
+            "promotions": {
+              "promotionalOffers": [
+                {
+                  "promotionalOffers": [
+                    {
+                      "startDate": "2026-10-15T15:00:00.000Z",
+                      "endDate": "2026-10-22T15:00:00.000Z",
+                      "discountSetting": {
+                        "discountType": "PERCENTAGE",
+                        "discountPercentage": 33
+                      }
+                    }
+                  ]
+                }
+              ],
+              "upcomingPromotionalOffers": []
+            }
+          },
+          {
+            "title": "Quiet Orbit",
+            "id": "e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0",
+            "namespace": "5d2b8e1f0a7c4b3d9e6f1a2b3c4d5e6f",
+            "keyImages": [
+              {
+                "type": "DieselStoreFrontWide",
+                "url": "https://cdn.example-store.test/quiet-orbit/storefront-wide.jpg"
+              }
+            ],
+            "productSlug": "quiet-orbit/home",
+            "urlSlug": "quiet-orbit",
+            "catalogNs": {
+              "mappings": [
+                {
+                  "pageType": "productHome",
+                  "pageSlug": "quiet-orbit"
+                }
+              ]
+            },
+            "price": {
+              "totalPrice": {
+                "discountPrice": 0,
+                "originalPrice": 0,
+                "currencyCode": "INR",
+                "currencyInfo": {
+                  "decimals": 2
+                }
+              }
+            },
+            "promotions": {
+              "promotionalOffers": [
+                {
+                  "promotionalOffers": [
+                    {
+                      "startDate": "2026-10-15T15:00:00.000Z",
+                      "endDate": "2026-10-22T15:00:00.000Z",
+                      "discountSetting": {
+                        "discountType": "PERCENTAGE",
+                        "discountPercentage": 0
+                      }
+                    }
+                  ]
+                }
+              ],
+              "upcomingPromotionalOffers": []
+            }
+          },
+          {
+            "title": "Glass Circuit",
+            "id": "f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1",
+            "namespace": "5d2b8e1f0a7c4b3d9e6f1a2b3c4d5e6f",
+            "keyImages": [],
+            "productSlug": "",
+            "urlSlug": "",
+            "catalogNs": {
+              "mappings": [
+                {
+                  "pageType": "productHome",
+                  "pageSlug": "glass-circuit"
+                }
+              ]
+            },
+            "price": {
+              "totalPrice": {
+                "discountPrice": 0,
+                "originalPrice": 89900,
+                "currencyCode": "INR",
+                "currencyInfo": {
+                  "decimals": 2
+                }
+              }
+            },
+            "promotions": {
+              "promotionalOffers": [
+                {
+                  "promotionalOffers": [
+                    {
+                      "startDate": "2026-10-15T15:00:00.000Z",
+                      "endDate": "2026-10-22T15:00:00.000Z",
+                      "discountSetting": {
+                        "discountType": "PERCENTAGE",
+                        "discountPercentage": 0
+                      }
+                    }
+                  ]
+                }
+              ],
+              "upcomingPromotionalOffers": []
+            }
+          },
+          {
+            "title": "Iron Meadow",
+            "id": "a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2",
+            "namespace": "5d2b8e1f0a7c4b3d9e6f1a2b3c4d5e6f",
+            "keyImages": [
+              {
+                "type": "OfferImageWide",
+                "url": "https://cdn.example-store.test/iron-meadow/offer-wide.jpg"
+              }
+            ],
+            "productSlug": "iron-meadow",
+            "urlSlug": "iron-meadow",
+            "catalogNs": {
+              "mappings": [
+                {
+                  "pageType": "productHome",
+                  "pageSlug": "iron-meadow"
+                }
+              ]
+            },
+            "price": {
+              "totalPrice": {
+                "discountPrice": 0,
+                "originalPrice": 99900,
+                "currencyCode": "INR",
+                "currencyInfo": {
+                  "decimals": 2
+                }
+              }
+            },
+            "promotions": {
+              "promotionalOffers": [],
+              "upcomingPromotionalOffers": [
+                {
+                  "promotionalOffers": [
+                    {
+                      "startDate": "2026-10-29T15:00:00.000Z",
+                      "endDate": "2026-11-05T15:00:00.000Z",
+                      "discountSetting": {
+                        "discountType": "PERCENTAGE",
+                        "discountPercentage": 0
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "title": "",
+            "id": "b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3",
+            "namespace": "5d2b8e1f0a7c4b3d9e6f1a2b3c4d5e6f",
+            "keyImages": [],
+            "productSlug": "untitled-entry",
+            "urlSlug": "untitled-entry",
+            "price": {
+              "totalPrice": {
+                "originalPrice": 0,
+                "currencyCode": "INR",
+                "currencyInfo": {
+                  "decimals": 2
+                }
+              }
+            },
+            "promotions": {
+              "promotionalOffers": [
+                {
+                  "promotionalOffers": [
+                    {
+                      "startDate": "2026-10-15T15:00:00.000Z",
+                      "endDate": "2026-10-22T15:00:00.000Z",
+                      "discountSetting": {
+                        "discountType": "PERCENTAGE",
+                        "discountPercentage": 0
+                      }
+                    }
+                  ]
+                }
+              ],
+              "upcomingPromotionalOffers": []
+            }
+          },
+          {
+            "title": "Soundtrack Pack Bundle",
+            "id": "c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4",
+            "namespace": "5d2b8e1f0a7c4b3d9e6f1a2b3c4d5e6f",
+            "keyImages": [],
+            "productSlug": "soundtrack-pack-bundle",
+            "urlSlug": "soundtrack-pack-bundle",
+            "price": {
+              "totalPrice": {
+                "originalPrice": 29900,
+                "currencyCode": "INR",
+                "currencyInfo": {
+                  "decimals": 2
+                }
+              }
+            },
+            "promotions": null
+          }
+        ]
+      }
+    }
+  },
+  "extensions": {}
+}
