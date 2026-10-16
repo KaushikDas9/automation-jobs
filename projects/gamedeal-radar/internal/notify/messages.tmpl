@@ -30,3 +30,11 @@ message text. A missing or broken file falls back to the text below.
 {{- define "final_failed"}}
 [GameDeal Radar] :rotating_light: GameDeal Radar {{.SlotLabel}} FAILED after {{.Attempt}} attempts. Coverage {{.CoveragePct}}%, {{.Failed}} of {{.Total}} games failed. A GitHub issue was opened. {{.RunURL}}
 {{- end}}
+
+{{- define "job_success"}}
+[GameDeal Radar] :white_check_mark: {{.Job}} finished. {{.Detail}} ({{.Duration}}). {{.RunURL}}
+{{- end}}
+
+{{- define "job_failed"}}
+[GameDeal Radar] :rotating_light: {{.Job}} FAILED. {{.Detail}} ({{.Duration}}). {{.RunURL}}
+{{- end}}

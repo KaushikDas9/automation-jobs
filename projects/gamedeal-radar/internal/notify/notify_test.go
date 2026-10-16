@@ -207,3 +207,16 @@ func TestFailureNeverLeaksURL(t *testing.T) {
 		t.Fatalf("leaked: %v", err)
 	}
 }
+
+func TestJobTemplatesRenderWithJobFields(t *testing.T) {
+	d := Data{Job: "GOG prices", Detail: "12 games, 24 rows written", Duration: "3m", RunURL: "https://example.test/run/1"}
+	for kind, want := range map[string]string{
+		JobSuccess: "[GameDeal Radar] :white_check_mark: GOG prices finished. 12 games, 24 rows written (3m).",
+		JobFailed:  "[GameDeal Radar] :rotating_light: GOG prices FAILED.",
+	} {
+		out, err := fast("x").render(kind, d)
+		if err != nil || !strings.HasPrefix(out, want) {
+			t.Errorf("%s: %q %v", kind, out, err)
+		}
+	}
+}

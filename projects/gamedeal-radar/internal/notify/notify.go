@@ -28,9 +28,12 @@ const (
 	Success       = "success"
 	AttemptFailed = "attempt_failed"
 	FinalFailed   = "final_failed"
+	// JobSuccess and JobFailed are used by the store price jobs (GOG, Epic, USD to INR).
+	JobSuccess = "job_success"
+	JobFailed  = "job_failed"
 )
 
-var kinds = []string{Success, AttemptFailed, FinalFailed}
+var kinds = []string{Success, AttemptFailed, FinalFailed, JobSuccess, JobFailed}
 
 // Data is what the message templates can use.
 type Data struct {
@@ -44,6 +47,9 @@ type Data struct {
 	CoveragePct string // one decimal, e.g. "99.6"
 	Duration    string
 	RunURL      string
+	// Job and Detail are used by the job templates only (job_success, job_failed).
+	Job    string // e.g. "GOG prices"
+	Detail string // one short line with the run's numbers
 }
 
 // SlotLabel formats a slot start in IST and UTC.
