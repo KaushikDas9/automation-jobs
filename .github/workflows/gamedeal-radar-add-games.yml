@@ -1,8 +1,10 @@
 name: GameDeal Radar add requested games
 
-# Processes the queue of games requested in the admin panel (table game_requests). For each
-# request it fetches Steam details, the Steam INR and USD prices, tags, and the GOG and Epic
-# prices, then makes the game active. Requests that Steam does not know end as not_found.
+# Processes the queue of games requested in the admin panel (table game_requests). A Steam
+# request gets Steam details, the Steam INR and USD prices, tags, and the GOG and Epic prices.
+# An Epic or GOG request (a game not on Steam) gets the store page details (key-free Epic and
+# GOG endpoints) and the Epic and GOG prices. Then the game is made active. Requests the store
+# does not know end as not_found.
 # Failed requests are tried again after an hour, up to 3 attempts. An empty queue exits
 # in seconds. GitHub cron is UTC only. IST has no DST, so these times never shift.
 #   20 */6 * * *  =  00:20, 06:20, 12:20, 18:20 UTC  =  05:50, 11:50, 17:50, 23:50 IST
@@ -56,7 +58,8 @@ jobs:
       - name: Process requested games
         env:
           GDR_DATABASE_URL: ${{ secrets.GDR_DATABASE_URL }}
-          # Optional. Without it the Epic step is skipped for every game.
+          # Optional. Without it the Epic price step is skipped (not failed) for every game,
+          # Steam, Epic or GOG; Epic store page details need no key.
           ITAD_API_KEY: ${{ secrets.ITAD_API_KEY }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           GDR_SLACK_WEBHOOK_URL: ${{ secrets.GDR_SLACK_WEBHOOK_URL }}

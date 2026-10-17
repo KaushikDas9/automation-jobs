@@ -441,6 +441,10 @@ func TestListGamesNeedingDetailsOncePerGameWithTwoMappings(t *testing.T) {
 	tx := testTx(t)
 	ctx := t.Context()
 
+	// Migration 000014 allows one mapping per (game, store), so the case cannot happen there.
+	if countRows(t, tx, `SELECT COUNT(*) FROM pg_constraint WHERE conname = 'uq_game_store_mappings_game_store'`) > 0 {
+		t.Skip("one mapping per game and store is enforced by the schema (migration 000014)")
+	}
 	gameID, _ := seedGame(t, tx, true, 1, true)
 	// A second Steam mapping for the same game must not make the game appear twice.
 	if _, err := tx.Exec(ctx, `

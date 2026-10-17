@@ -412,10 +412,15 @@ or the write failed, 2 configuration error.
 
 ## Requested games job (`cmd/add-games`)
 
-Processes the queue of games an admin requested in the GameDeal Radar panel. For each
-request the API has already created an inactive `games` row, the Steam
-`game_store_mappings` row, and a `game_requests` queue row. This job fills in the data and
-makes the game active. The workflow is `gamedeal-radar-add-games.yml`.
+Processes the queue of games an admin requested in the GameDeal Radar panel. A request comes
+from one store: **Steam**, **Epic** (for example Alan Wake 2, which is not on Steam) or **GOG**.
+For each request the API has already created an inactive `games` row (name, slug and header
+image from the store), the `game_store_mappings` row for that store (`external_app_id` is the
+store's own id), and a `game_requests` queue row with `store_id` and `external_id`: the Steam
+app id, the Epic slug (`alan-wake-2`) or the GOG slug (`alan_wake`). `steam_app_id` is NULL
+for an Epic or GOG request. This job fills in the data and makes the game active. It never
+inserts games or mappings and never changes a game column other than `is_active` and
+`updated_at`. The workflow is `gamedeal-radar-add-games.yml`.
 
 ### Schedule
 
@@ -432,28 +437,52 @@ nothing and writes nothing. Untick `dry_run` to process the queue for real. `max
 the requests handled in the run (default 10). To process specific requests from a terminal,
 set `GAME_REQUEST_IDS` to a comma list of request ids.
 
+From a terminal (Go 1.24, in `projects/gamedeal-radar`):
+
+```sh
+GDR_DATABASE_URL=... DRY_RUN=1 go run ./cmd/add-games            # read only: one line per request
+GDR_DATABASE_URL=... GAME_REQUEST_IDS=<uuid> go run ./cmd/add-games  # process one request for real
+```
+
+`ITAD_API_KEY` is optional; without it the Epic price step is skipped (never failed).
+
 ### Statuses
 
 | Status | Meaning |
 | --- | --- |
 | `pending` | Waiting for the next run. Created by the API. |
 | `processing` | Claimed by a run. `attempts` went up by one and `started_at` is set. |
-| `done` | Both core steps passed and the game is active. `error` is empty, or a short note about optional steps that were skipped or failed (for example `gog: no match; epic: skipped, no api key`). |
-| `not_found` | Steam has no such app, or it is not a game (music, video and so on). The game stays inactive. |
+| `done` | The core steps of the request's store passed and the game is active. `error` is empty, or a short note about optional steps that were skipped or failed (for example `gog: no match; epic: skipped, no api key`). |
+| `not_found` | The store has no such item: Steam has no such app or it is not a game (music, video and so on); Epic has no product page for the slug (HTTP 404, or a page without a product name); GOG's catalog does not list the slug or its product page is 404; or the stored id is not a valid Steam app id / slug. The game stays inactive. |
 | `failed` | A core step failed. The game stays inactive and `error` holds a short, non-sensitive reason. A failed request is claimed again after 1 hour, up to 3 attempts. |
 
 A request stuck in `processing` for more than 1 hour (a run that died) is claimed again by the
 same rule. Claiming uses `SELECT ... FOR UPDATE SKIP LOCKED` in a short transaction, so two runs
-never take the same row.
+never take the same row. The claim reads each row's store code (join on `stores`) and
+`external_id`. A row with no `external_id` (older rows) falls back to `steam_app_id`, and a row
+with no store is treated as Steam. A request that has a newer request for the same store item
+(`store_id`, `external_id`) is skipped: the newer one is the live one.
 
 ### Steps for each game
 
+Which steps run depends on the request's store. The log has one line per request with the
+store and each step as ok, skipped or failed, for example
+`request game="Alan Wake 2" store=epic status=done steps=[details=ok epic=skipped gog=skipped]`.
+
+| Store | Core steps (must pass to activate) | Optional steps (never block activation) | Not run |
+| --- | --- | --- | --- |
+| steam | details (Steam), inr | usd, tags, gog, epic | none |
+| epic | details (Epic product page) | epic price, gog price | inr, usd, tags (no Steam app id) |
+| gog | details (GOG product data) | gog price, epic price | inr, usd, tags (no Steam app id) |
+
 | Step | Existing code it reuses | Kind |
 | --- | --- | --- |
-| details | `steam.Client.FetchDetails` and `FetchReviews`, `db.Repo.UpsertGameDetails` (as `cmd/details-check`) | core |
-| inr | `run.Execute` on a one-game view: fetch, snapshot, current price, price events, `MarkChecked` (as `cmd/daily-check`) | core |
-| usd | `usd.Execute` on a one-game view (as the daily USD pass) | optional |
-| tags | `steamtags.Collect` and `db.Repo.SaveTags` (as `cmd/steam-tags`) | optional |
+| details (steam) | `steam.Client.FetchDetails` and `FetchReviews`, `db.Repo.UpsertGameDetails` (as `cmd/details-check`) | core |
+| details (epic) | `storedetails.Client.EpicDetails`, then `db.Repo.UpsertGameDetails` with no reviews | core |
+| details (gog) | `storedetails.Client.GOGDetails`, then `db.Repo.UpsertGameDetails` with no reviews | core |
+| inr | `run.Execute` on a one-game view: fetch, snapshot, current price, price events, `MarkChecked` (as `cmd/daily-check`) | core (Steam only) |
+| usd | `usd.Execute` on a one-game view (as the daily USD pass) | optional (Steam only) |
+| tags | `steamtags.Collect` and `db.Repo.SaveTags` (as `cmd/steam-tags`) | optional (Steam only) |
 | gog | `storeprices.RunGOG` on a one-game view (as `cmd/gog-prices`) | optional |
 | epic | `itad.RunEpic` on a one-game view (as `cmd/epic-prices`); skipped when `ITAD_API_KEY` is empty | optional |
 
@@ -462,10 +491,57 @@ inactive until the end. Manual rows in `game_store_prices` are respected exactly
 GOG and Epic jobs. All Steam calls share one client at no more than 1 request per second,
 with the same timeouts and retries as the other Steam jobs.
 
-A game is activated (`UPDATE games SET is_active = true, updated_at = now()`) only when
-details and INR both succeed. A game that Steam lists without an INR price (for example free
-or unreleased) counts as success for INR and the note says `inr: no steam price in India`. If a
-core step fails, the optional steps are not run; the retry does them.
+A game is activated (`UPDATE games SET is_active = true, updated_at = now()`) only when the
+core steps of its store succeed. For Steam that is details and INR: a game that Steam lists
+without an INR price (for example free or unreleased) counts as success for INR and the note
+says `inr: no steam price in India`. For Epic and GOG it is the details step only; prices are
+optional because Epic prices also come from the daily `epic-prices` job or a manual price set
+by the admin. Without `ITAD_API_KEY` the note says `epic: skipped, no api key` and the game is
+still activated. If a core step fails, the optional steps are not run; the retry does them.
+Failure notes are fixed, short texts (for example `details: epic temporarily unavailable`),
+never error text, URLs or response bodies. An Epic or GOG request whose game is also on Steam
+runs no Steam step; the Steam jobs pick the game up through its Steam mapping once it is active.
+
+### Where Epic and GOG details come from
+
+Both are read by `internal/storedetails`, key-free, from fixed hosts only. The slug is
+validated before any URL is built (Epic `^[a-z0-9][a-z0-9-]{0,119}$`, GOG
+`^[a-z0-9][a-z0-9_-]{0,119}$`, so `../`, uppercase, URLs and long values are refused and no
+request is sent). Redirects off the host are refused, each request has a 20 second timeout and
+the jobs' honest User-Agent, a body over 5 MB is an error, a 5xx or network error is retried
+once, and bodies are never logged.
+
+- **Epic**: `https://store-content-ipv4.ak.epicgames.com/api/en-US/content/products/<slug>`, the
+  public product page JSON the store itself uses. The `productHome` page is read (Fortnite-style
+  pages list other pages first). Mapping: `about.shortDescription` (else the first paragraph of
+  `about.description`) to `short_description`; `about.developerAttribution` /
+  `publisherAttribution` (else `meta.developer` / `meta.publisher`) to developers and
+  publishers; carousel images, `gallery.galleryImages`, `hero.backgroundImageUrl` and
+  `about.image` to `screenshots` (same `{thumb, full}` shape as Steam, Epic CDN hosts only,
+  thumb = full); carousel videos to `movies` only when Epic gives a direct `video-hls` (`.m3u8`)
+  or `video-fmp4` (`.mpd`) manifest URL (some pages only give media ids: those are skipped);
+  `requirements.systems` to the `*_req_min_html` / `*_req_rec_html` columns as
+  `<strong>Minimum:</strong><br><ul class="bb_ul"><li><strong>OS:</strong> ...</li></ul>`,
+  with every value HTML-escaped (no Epic HTML is passed through) and then cleaned by
+  `htmlclean`; `requirements.languages` to `supported_languages_html` as an escaped comma
+  list; `meta.releaseDate` to `release_date` and `release_date_text` ("9 Dec, 2020");
+  `meta.customReleaseDate` only when there is no ISO date and it names a year (Alan Wake 2's
+  page still says "Coming Soon"); `productRatings` to `age_ratings` (board = country code);
+  `socialLinks.linkHomepage` to `website`. Reviews, Metacritic, genres and categories stay empty.
+- **GOG**: GOG has no key-free lookup by slug, so the public catalog
+  `https://catalog.gog.com/v1/catalog?query=like:<text>` is searched with the game's name, then
+  with the slug's words, and only a product whose `slug` is exactly the requested slug is
+  accepted. Its numeric id then reads `https://api.gog.com/v2/games/<id>?locale=en-US`. Mapping:
+  the first paragraph of `description` (as text) to `short_description`; catalog developers,
+  publishers and genres; v2 screenshots (`_1600` full, `_product_card_screenshot_748` thumb, on
+  `images.gog-statics.com`); `supportedOperatingSystems` requirements, escaped as above; text
+  localizations to `supported_languages_html`; `globalReleaseDate` to the release date; ESRB,
+  PEGI, USK and Brazil ratings to `age_ratings`. GOG trailers are YouTube embeds with no direct
+  video URL, so `movies` stays empty.
+
+The website currently renders screenshots and trailers from Steam hosts only, so Epic and GOG
+media are stored but not shown until the site allows those hosts. The details-check job only
+refreshes games with a Steam mapping, so Epic and GOG details are written once, by this job.
 
 ### Exit codes and notifications
 
@@ -478,7 +554,7 @@ core step fails, the optional steps are not run; the retry does them.
 GITHUB_OUTPUT gets `complete`, `final_attempt`, `blocked`, `coverage_pct` (done or not_found out
 of claimed), `failed_games` and `total_games`. Slack gets one `success` or `failed` line per run
 that claimed games (not for an empty queue or a dry run). The log has one line per game with
-the game name and each step as ok, skipped or failed. No failure issue is opened and no
+the game name, its store and each step as ok, skipped or failed. No failure issue is opened and no
 healthcheck is pinged by the workflow.
 
 ### Environment variables
@@ -489,7 +565,7 @@ healthcheck is pinged by the workflow.
 | `MAX_GAMES` | no | `10` | Requests claimed per run, 1 to 50. |
 | `GAME_REQUEST_IDS` | no | none | Comma list of request ids (UUIDs). Only these are claimed. |
 | `DRY_RUN` | no | `0` | `1` or `true` fetches and prints, claims nothing, writes nothing. Manual runs default to `1`. |
-| `ITAD_API_KEY` | no | none | Price provider key for the Epic step. Without it the Epic step is skipped. Never logged. |
+| `ITAD_API_KEY` | no | none | Price provider key for the Epic price step. Without it the Epic price step is skipped (not failed) and the game is still activated. Never logged. |
 | `GDR_HEALTHCHECK_URL` | no | none | Dead man's switch URL (secret). Not set by the workflow. |
 | `SLACK_WEBHOOK_URL`, `GDR_SLACK_WEBHOOK_URL` | no | none | Slack webhook, as in the other jobs. |
 

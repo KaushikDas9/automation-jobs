@@ -1,0 +1,327 @@
+{
+ "productName": "Cyberpunk 2077",
+ "_slug": "cyberpunk-2077",
+ "_title": "cyberpunk-2077",
+ "namespace": "77f2b98e2cef40c8a7437518bf420e47",
+ "productRatings": {
+  "_type": "Epic Store Product Ratings",
+  "ratings": [
+   {
+    "image": {
+     "src": "https://cdn2.unrealengine.com/Diesel%2Fproduct%2Fratings%2FCSRR_18-531x532-5693972c041c0639a3b59af22d5f582f1920c25e.png",
+     "_type": "Epic Store Image"
+    },
+    "countryCodes": "TW",
+    "_type": "Epic Store Rating",
+    "title": "R"
+   },
+   {
+    "image": {
+     "src": "https://cdn2.unrealengine.com/Diesel%2Fproduct%2Fratings%2FFPB_18-621x537-938faaf6badc3a10e04505609b89f519cd6ddf58.png",
+     "_type": "Epic Store Image"
+    },
+    "countryCodes": "ZA",
+    "_type": "Epic Store Rating",
+    "title": "18"
+   },
+   {
+    "image": {
+     "src": "https://cdn2.unrealengine.com/Diesel%2Fproduct%2Fratings%2FDEJUS_Rating_Symbol_18-500x500-7c83d0224e6024c4441254ba2c6ddbc1deafe941.png",
+     "_type": "Epic Store Image"
+    },
+    "countryCodes": "BR",
+    "_type": "Epic Store Rating",
+    "title": "18 anos"
+   }
+  ]
+ },
+ "pages": [
+  {
+   "type": "productHome",
+   "_slug": "home",
+   "productName": "Cyberpunk 2077",
+   "productRatings": {
+    "_type": "Epic Store Product Ratings",
+    "ratings": [
+     {
+      "image": {
+       "src": "https://cdn2.unrealengine.com/Diesel%2Fproduct%2Fratings%2FCSRR_18-531x532-5693972c041c0639a3b59af22d5f582f1920c25e.png",
+       "_type": "Epic Store Image"
+      },
+      "countryCodes": "TW",
+      "_type": "Epic Store Rating",
+      "title": "R"
+     },
+     {
+      "image": {
+       "src": "https://cdn2.unrealengine.com/Diesel%2Fproduct%2Fratings%2FFPB_18-621x537-938faaf6badc3a10e04505609b89f519cd6ddf58.png",
+       "_type": "Epic Store Image"
+      },
+      "countryCodes": "ZA",
+      "_type": "Epic Store Rating",
+      "title": "18"
+     },
+     {
+      "image": {
+       "src": "https://cdn2.unrealengine.com/Diesel%2Fproduct%2Fratings%2FDEJUS_Rating_Symbol_18-500x500-7c83d0224e6024c4441254ba2c6ddbc1deafe941.png",
+       "_type": "Epic Store Image"
+      },
+      "countryCodes": "BR",
+      "_type": "Epic Store Rating",
+      "title": "18 anos"
+     }
+    ]
+   },
+   "data": {
+    "about": {
+     "image": {
+      "altText": "Cyberpunk 2077 for PC",
+      "src": "https://cdn2.unrealengine.com/egs-cyberpunk2077-cdprojektred-s2-03-22-22-1200x1600-829751b50fec.jpg",
+      "_type": "Diesel Image"
+     },
+     "developerAttribution": "CD PROJEKT RED",
+     "_type": "Diesel Product About",
+     "publisherAttribution": "CD PROJEKT RED",
+     "description": "![Gif1](https://cdn2.unrealengine.com/cp77-egs-01-en-abe5a81f3c9a.gif)\n![Gif3](https://cdn2.unrealengine.com/cp77-egs-03-en-9a3e6304f65c.gif)\n![Gif4](https://cdn2.unrealengine.com/cp77-egs-04-en-f8d72b05f413.gif)\n![Gif5](https://cdn2.unrealengine.com/cp77-egs-05-en-df8c6e0809f9.gif)\n![Gif6](https://cdn2.unrealengine.com/cp77-egs-06-en-a0fdb8e60b19.gif)\n![Gif7](https://cdn2.unrealengine.com/cp77-egs-07-en-9dd18c3b2487.gif)",
+     "shortDescription": "Cyberpunk 2077 is an open-world, action-adventure RPG set in the dark future of Night City — a dangerous megalopolis obsessed with power, glamor, and ceaseless body modification.",
+     "title": "**CYBERPUNK 2077**",
+     "developerLogo": {
+      "_type": "Diesel Image"
+     }
+    },
+    "hero": {
+     "logoImage": {
+      "altText": "Cyberpunk 2077 Logo",
+      "src": "https://cdn2.unrealengine.com/egs-cyberpunk2077-cdprojektred-ic1-400x400-82b90aa9a275.png",
+      "_type": "Diesel Image"
+     },
+     "portraitBackgroundImageUrl": "https://cdn2.unrealengine.com/egs-cyberpunk2077-cdprojektred-s2-03-22-22-1200x1600-829751b50fec.jpg",
+     "_type": "Diesel Hero",
+     "action": {
+      "_type": "Diesel Action",
+      "text": ""
+     },
+     "video": {
+      "recipes": "{\n    \"en-US\": [\n        {\n            \"recipe\": \"video-fmp4-noaudio\",\n            \"mediaRefId\": \"0fb2e44e03d445f18bd898234cc03198\"\n        },\n        {\n            \"recipe\": \"video-hls-noaudio\",\n            \"mediaRefId\": \"c4d9e0ee91a8414380aaa5d108ffc662\"\n        },\n        {\n            \"recipe\": \"video-webm-noaudio\",\n            \"mediaRefId\": \"0e97e2ff21e141fe96939819c3f6e31d\"\n        }\n    ]\n}",
+      "sources": [
+       {
+        "src": "https://cdn2.unrealengine.com/Diesel%2Fproduct%2Fcyberpunk-2077%2Fhome%2F256_EPIC_store_1_webm-f34ff5e7ffba1ca04059a016eab4142c5843792f.WebM",
+        "_type": "Diesel Html Video Source",
+        "type": "video/webm"
+       },
+       {
+        "src": "https://cdn2.unrealengine.com/Diesel%2Fproduct%2Fcyberpunk-2077%2Fhome%2F256_EPIC_store_1-efab52fb11fd5eb7807f1a1bd8003631d0703660.mp4",
+        "_type": "Diesel Html Video Source",
+        "type": "video/mp4"
+       }
+      ],
+      "loop": true,
+      "_type": "Diesel Video",
+      "hasFullScreen": false,
+      "hasControls": true,
+      "type": "epicHosted",
+      "muted": true,
+      "autoplay": false
+     },
+     "isFullBleed": false,
+     "altContentPosition": false,
+     "backgroundImageUrl": "https://cdn2.unrealengine.com/egs-cyberpunk2077-cdprojektred-s1-03-22-22-2560x1440-8b29e725f1ef.jpg"
+    },
+    "meta": {
+     "releaseDate": "2020-12-10T00:00:00.000Z",
+     "_type": "Epic Store Meta",
+     "publisher": [
+      "CD PROJEKT RED"
+     ],
+     "logo": {
+      "_type": "Epic Store Image"
+     },
+     "developer": [
+      "CD PROJEKT RED"
+     ],
+     "customReleaseDate": "",
+     "platform": [
+      "Windows",
+      "Mac"
+     ],
+     "tags": [
+      "RPG",
+      "SINGLE_PLAYER",
+      "ACTION"
+     ]
+    },
+    "requirements": {
+     "languages": [
+      "AUDIO: English, French, German, Italian, Spanish - Spain, Japanese, Polish, Portuguese - Brazil, Chinese - Simplified, Korean, Russian",
+      "TEXT: Spanish - Latin America, Thai, Czech, Hungarian, Chinese - Traditional, Arabic, Turkish, English, Italian, Spanish - Spain, Japanese, Portuguese - Brazil, Chinese - Simplified, French, German, Korean, Polish, Russian"
+     ],
+     "systems": [
+      {
+       "_type": "Diesel System Detail",
+       "systemType": "Windows",
+       "details": [
+        {
+         "_type": "Diesel System Detail Item",
+         "title": "OS",
+         "minimum": "Windows 10",
+         "recommended": "Windows 10"
+        },
+        {
+         "_type": "Diesel System Detail Item",
+         "title": "Processor",
+         "minimum": "Intel Core i7-6700 or Ryzen 5 1600",
+         "recommended": "Intel Core i7-12700 or Ryzen 7 7800X"
+        },
+        {
+         "_type": "Diesel System Detail Item",
+         "title": "Memory",
+         "minimum": "12 GB RAM",
+         "recommended": "16 GB RAM"
+        },
+        {
+         "_type": "Diesel System Detail Item",
+         "title": "Graphics",
+         "minimum": "NVIDIA GeForce GTX 1060 6 GB or Radeon RX 580 8GB or Arc A380",
+         "recommended": "NVIDIA GeForce GTX 2060 SUPER or Radeon RX 5700 XT or Arc A770"
+        },
+        {
+         "_type": "Diesel System Detail Item",
+         "title": "Storage",
+         "minimum": "70GB SSD (90GB SSD with Phantom Liberty)",
+         "recommended": ""
+        },
+        {
+         "_type": "Diesel System Detail Item",
+         "title": "Direct X",
+         "minimum": "Version 12"
+        }
+       ]
+      },
+      {
+       "_type": "Diesel System Detail",
+       "systemType": "MacOS",
+       "details": [
+        {
+         "_type": "Diesel System Detail Item",
+         "title": "Mac OS",
+         "minimum": "macOS: 15.5 or later",
+         "recommended": "macOS: 15.5 or later"
+        },
+        {
+         "_type": "Diesel System Detail Item",
+         "title": "Mac OS Processor",
+         "minimum": "M1",
+         "recommended": "M3 Pro"
+        },
+        {
+         "_type": "Diesel System Detail Item",
+         "title": "Mac OS Memory",
+         "minimum": "16 GB",
+         "recommended": "18 GB"
+        },
+        {
+         "_type": "Diesel System Detail Item",
+         "title": "Mac OS Storage",
+         "minimum": "92 GB",
+         "recommended": "92 GB"
+        }
+       ]
+      }
+     ],
+     "accountRequirements": "EPIC_ACCOUNT",
+     "_type": "Diesel System Details",
+     "rating": {
+      "_type": "Diesel Rating"
+     }
+    },
+    "socialLinks": {
+     "linkTwitter": "https://twitter.com/CyberpunkGame",
+     "linkTwitch": "",
+     "linkFacebook": "https://www.facebook.com/CyberpunkGame",
+     "linkYoutube": "",
+     "_type": "Diesel Social Links",
+     "linkDiscord": "https://discordapp.com/invite/cyberpunkgame",
+     "title": "Follow Cyberpunk 2077",
+     "linkHomepage": "https://www.cyberpunk.net/",
+     "linkInstagram": ""
+    },
+    "carousel": {
+     "_type": "Diesel Carousel",
+     "items": [
+      {
+       "image": {
+        "_type": "Diesel Image"
+       },
+       "_type": "Diesel Carousel Item - Image OR Video",
+       "video": {
+        "epicStillDurationSeconds": 2,
+        "recipes": "{\n  \"en-US\": [\n    {\n      \"recipe\": \"video-fmp4\",\n      \"outputs\": [\n        {\n          \"contentType\": \"application/dash+xml\",\n          \"key\": \"manifest\",\n          \"url\": \"https://media-cdn.epicgames.com/c008c1a2647b4b109ff6892bf7733438/c008c1a2647b4b109ff6892bf7733438.mpd\"\n        },\n        {\n          \"contentType\": \"image/png\",\n          \"key\": \"thumbnail\",\n          \"url\": \"https://media-cdn.epicgames.com/c008c1a2647b4b109ff6892bf7733438/c008c1a2647b4b109ff6892bf7733438-00001-thumb.png\"\n        }\n      ],\n      \"mediaRefId\": \"0d281f00ee4f4ae7b8b607ed9c5cec96\"\n    },\n    {\n      \"recipe\": \"video-webm\",\n      \"outputs\": [\n        {\n          \"contentType\": \"application/dash+xml\",\n          \"key\": \"manifest\",\n          \"url\": \"https://media-cdn.epicgames.com/0d75eb18b58d4c4a93def5936d99d061/0d75eb18b58d4c4a93def5936d99d061.mpd\"\n        },\n        {\n          \"contentType\": \"image/png\",\n          \"key\": \"thumbnail\",\n          \"url\": \"https://media-cdn.epicgames.com/0d75eb18b58d4c4a93def5936d99d061/0d75eb18b58d4c4a93def5936d99d061-00001-thumb.png\"\n        }\n      ],\n      \"mediaRefId\": \"5fe8d17a8e614ed39533d139be211d67\"\n    },\n    {\n      \"recipe\": \"video-hls\",\n      \"outputs\": [\n        {\n          \"contentType\": \"application/x-mpegURL\",\n          \"key\": \"manifest\",\n          \"url\": \"https://media-cdn.epicgames.com/05ec210da6ef4a84b07d900b5e9d57a8/05ec210da6ef4a84b07d900b5e9d57a8.m3u8\"\n        },\n        {\n          \"contentType\": \"image/png\",\n          \"key\": \"thumbnail\",\n          \"url\": \"https://media-cdn.epicgames.com/05ec210da6ef4a84b07d900b5e9d57a8/05ec210da6ef4a84b07d900b5e9d57a8-00001-thumb.png\"\n        }\n      ],\n      \"mediaRefId\": \"52d9da40817c46a58cb7202d07e467d1\"\n    }\n  ]\n}",
+        "epicStillType": "PREPEND",
+        "loop": true,
+        "_type": "Diesel Video",
+        "hasFullScreen": false,
+        "hasControls": true,
+        "title": "1",
+        "type": "epicHosted",
+        "muted": true,
+        "poster": "https://cdn2.unrealengine.com/cp2077-2-1-update-thumbnail-en-1920x1080-46b8c088956e.jpg",
+        "autoplay": true
+       }
+      },
+      {
+       "image": {
+        "altText": "Cyberpunk 2077 Night City",
+        "src": "https://cdn2.unrealengine.com/egs-cyberpunk2077-cdprojektred-g1a-10-1920x1080-1b15f1171b7e.jpg",
+        "_type": "Diesel Image"
+       },
+       "_type": "Diesel Carousel Item - Image OR Video",
+       "video": {
+        "loop": false,
+        "_type": "Diesel Video",
+        "hasFullScreen": false,
+        "hasControls": false,
+        "title": "5",
+        "muted": false,
+        "autoplay": false
+       }
+      },
+      {
+       "image": {
+        "altText": "Cyberpunk 2077 on PC",
+        "src": "https://cdn2.unrealengine.com/egs-cyberpunk2077-cdprojektred-g1a-11-1920x1080-335082294ad5.jpg",
+        "_type": "Diesel Image"
+       },
+       "_type": "Diesel Carousel Item - Image OR Video",
+       "video": {
+        "loop": false,
+        "_type": "Diesel Video",
+        "hasFullScreen": false,
+        "hasControls": false,
+        "title": "OUT",
+        "muted": false,
+        "autoplay": false
+       }
+      }
+     ]
+    },
+    "gallery": {}
+   }
+  },
+  {
+   "type": "offer",
+   "_slug": "ultimate-edition",
+   "productName": "Cyberpunk 2077",
+   "data": {
+    "_type": "Diesel Product Detail"
+   }
+  },
+  {
+   "type": "info",
+   "_slug": "faq",
+   "productName": "Cyberpunk 2077",
+   "data": {
+    "_type": "Diesel Product Detail"
+   }
+  }
+ ]
+}

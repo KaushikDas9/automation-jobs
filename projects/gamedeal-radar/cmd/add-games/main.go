@@ -1,8 +1,10 @@
 // Command add-games processes the queue of admin-requested games (table game_requests).
 // For each claimed request it runs the same steps as the full automation, for that one
-// game: Steam details and reviews, the Steam INR price, the USD price, Steam tags, and the
-// GOG and Epic prices. When the two core steps (details, INR price) succeed it sets
-// games.is_active = true and marks the request done. See projects/gamedeal-radar/README.md.
+// game. A Steam request gets Steam details and reviews, the Steam INR price, the USD price,
+// Steam tags, and the GOG and Epic prices; its core steps are details and INR. An Epic or
+// GOG request (a game that is not on Steam) gets the store page details, its core step, and
+// the Epic and GOG prices. When the core steps succeed it sets games.is_active = true and
+// marks the request done. See projects/gamedeal-radar/README.md.
 //
 // Environment:
 //
@@ -39,6 +41,7 @@ import (
 	"gamedeal-radar/daily-check/internal/jobrun"
 	"gamedeal-radar/daily-check/internal/steam"
 	"gamedeal-radar/daily-check/internal/steamtags"
+	"gamedeal-radar/daily-check/internal/storedetails"
 	"gamedeal-radar/daily-check/internal/storeprices"
 )
 
@@ -192,6 +195,7 @@ func execute(ctx context.Context, cfg config) (addgames.Summary, error) {
 		Steam:  steam.NewClient(steam.DefaultConfig()), // 1 request/second, shared by all Steam calls
 		TagSrc: steamtags.NewClient(),
 		GOGAPI: &storeprices.GOGClient{Fetcher: storeprices.NewFetcher(time.Second)},
+		Pages:  storedetails.NewClient(), // Epic and GOG store pages, fixed hosts only
 		DryRun: cfg.dryRun,
 	}
 	if cfg.apiKey != "" {

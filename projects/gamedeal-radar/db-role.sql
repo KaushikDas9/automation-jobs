@@ -93,6 +93,9 @@ GRANT SELECT, INSERT, UPDATE ON fx_rates TO gdr_daily_job;
 --     it writes (game_details, prices, snapshots, events, game_store_prices, tags) is already
 --     granted in sections 3 to 8. There is NO INSERT or DELETE on game_requests or games:
 --     the API creates the rows, the job cannot create or remove a game.
+--     Epic and GOG requests (game_requests.store_id / external_id, migrations 000014 and
+--     000015) need nothing new: the claim joins stores (SELECT, section 3), the store page
+--     details go to game_details (section 7), and the job never inserts game_store_mappings.
 --       GRANT SELECT, UPDATE ON game_requests TO gdr_daily_job;
 --       GRANT UPDATE (is_active, updated_at) ON games TO gdr_daily_job;
 GRANT SELECT, UPDATE ON game_requests TO gdr_daily_job;

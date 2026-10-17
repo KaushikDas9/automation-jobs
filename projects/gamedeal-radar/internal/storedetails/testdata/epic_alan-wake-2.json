@@ -1,0 +1,218 @@
+{
+ "productName": "Alan Wake 2",
+ "_slug": "alan-wake-2",
+ "_title": "Alan-Wake-2",
+ "namespace": "c4763f236d08423eb47b4c3008779c84",
+ "productRatings": {
+  "_type": "Epic Store Product Ratings"
+ },
+ "pages": [
+  {
+   "type": "productHome",
+   "_slug": "home",
+   "productName": "Alan Wake 2",
+   "productRatings": {
+    "_type": "Epic Store Product Ratings"
+   },
+   "data": {
+    "about": {
+     "image": {
+      "src": "https://cdn2.unrealengine.com/egs-alanwake2-remedyentertainment-s2-1200x1600-0ebb9a566b72.jpg",
+      "_type": "Diesel Image"
+     },
+     "developerAttribution": "Remedy Entertainment",
+     "_type": "Diesel Product About",
+     "publisherAttribution": "Epic Games Publishing",
+     "description": "A string of ritualistic murders threatens Bright Falls, a small-town community surrounded by Pacific Northwest wilderness. Saga Anderson, an accomplished FBI agent with a reputation for solving impossible cases arrives to investigate the murders. Anderson’s case spirals into a nightmare when she discovers pages of a horror story that starts to come true around her.\n\nAlan Wake, a lost writer trapped in a nightmare beyond our world, writes a dark story in an attempt to shape the reality around him and escape his prison. With a dark horror hunting him, Wake is trying to retain his sanity and beat the devil at his own game. \n\nAnderson and Wake are two heroes on two desperate journeys in two separate realities, connected at heart in ways neither of them can understand: reflecting each other, echoing each other, and      affecting the worlds around them. \n\nFueled by the horror story, supernatural darkness invades Bright Falls, corrupting the locals and threatening the loved ones of both Anderson and Wake. Light is their weapon—and their safe haven — against the darkness they face. Trapped in a sinister horror story where there are only victims and monsters, can they break out to be the heroes they need to be? \n\n# Solve a Deadly Mystery \nWhat begins as a small-town murder investigation rapidly spirals into a nightmare journey. Uncover the source of the supernatural darkness in this psychological horror story filled with intense suspense and unexpected twists. \n\n# Play As Two Characters \nExperience both Alan Wake’s and Saga Anderson’s stories and see events unfold from different perspectives. Switch between Anderson’s life-or-death race to solve the case and Wake’s desperate attempts to rewrite his reality to escape the depths of the Dark Place. \n \n# Explore Two Worlds \nExperience two beautiful yet terrifying worlds, each with its own rich cast of characters and deadly threats. Discover majestic landscapes of Cauldron Lake in the Pacific Northwest and the idyllic towns of Bright Falls and Watery. Contrasting sharply, attempt to escape the nightmarish cityscape of the Dark Place. \n \n# Survive With Light \nWith limited resources, take on powerful supernatural enemies in desperate close-combat situations. It takes more than just a gun to survive: light is the ultimate weapon in the fight against the darkness and will be your refuge when enemies threaten to overwhelm you.\n\n",
+     "shortDescription": "Saga Anderson arrives to investigate ritualistic murders in a small town. Alan Wake pens a dark story to shape the reality around him. These two heroes are somehow connected. Can they become the heroes they need to be?",
+     "title": "Alan Wake 2: Winner of Time Magazine's Game of the Year; Washington Post's Game of the Year; The Game Awards' Best Game Direction, Best Art Direction and Best Narrative; and Golden Joystick's Critics' Choice Award.",
+     "developerLogo": {
+      "_type": "Diesel Image"
+     }
+    },
+    "hero": {
+     "logoImage": {
+      "src": "https://cdn2.unrealengine.com/egs-alanwake2-remedyentertainment-ic1-400x400-5366b10d0f67.png",
+      "_type": "Diesel Image"
+     },
+     "portraitBackgroundImageUrl": "https://cdn2.unrealengine.com/egs-alanwake2-remedyentertainment-s2-1200x1600-0ebb9a566b72.jpg",
+     "_type": "Diesel Hero",
+     "action": {
+      "_type": "Diesel Action"
+     },
+     "video": {
+      "loop": false,
+      "_type": "Diesel Video",
+      "hasFullScreen": false,
+      "hasControls": false,
+      "muted": false,
+      "autoplay": false
+     },
+     "isFullBleed": false,
+     "altContentPosition": false,
+     "backgroundImageUrl": "https://cdn2.unrealengine.com/egs-alanwake2-remedyentertainment-s1-2560x1440-309c7412b7bc.jpg"
+    },
+    "meta": {
+     "_type": "Epic Store Meta",
+     "logo": {
+      "_type": "Epic Store Image"
+     },
+     "customReleaseDate": "Coming Soon"
+    },
+    "requirements": {
+     "languages": [
+      "AUDIO: English, German, Spanish - Spain, Japanese, French | TEXT: English, German, French, Spanish - Spain, Spanish - Latin America, Japanese, Italian, Chinese - Simplified, Chinese - Traditional, Russian, Ukrainian, Polish, Korean, Portuguese - Brazil"
+     ],
+     "systems": [
+      {
+       "_type": "Diesel System Detail",
+       "systemType": "Windows",
+       "details": [
+        {
+         "_type": "Diesel System Detail Item",
+         "title": "Windows OS",
+         "minimum": "Windows 10/11 64-bit",
+         "recommended": "Windows 10/11 64-bit"
+        },
+        {
+         "_type": "Diesel System Detail Item",
+         "title": "Windows Processor",
+         "minimum": "Intel i5-7600K or AMD equivalent",
+         "recommended": "Ryzen 7 3700X or Intel equivalent"
+        },
+        {
+         "_type": "Diesel System Detail Item",
+         "title": "Windows Memory",
+         "minimum": "16 GB",
+         "recommended": "16 GB"
+        },
+        {
+         "_type": "Diesel System Detail Item",
+         "title": "Windows Storage",
+         "minimum": "SSD with 90 GB free space",
+         "recommended": "SSD with 90 GB free space"
+        },
+        {
+         "_type": "Diesel System Detail Item",
+         "title": "Windows Graphics",
+         "minimum": "GeForce GTX 1070 / Radeon RX 5600 XT",
+         "recommended": "GeForce RTX 3060 / Radeon RX 6600 XT"
+        }
+       ]
+      }
+     ],
+     "accountRequirements": "EPIC_ACCOUNT",
+     "_type": "Diesel System Details",
+     "rating": {
+      "_type": "Diesel Rating"
+     }
+    },
+    "socialLinks": {
+     "linkTwitter": "http://twitter.com/alanwake",
+     "linkFacebook": "http://facebook.com/alanwake",
+     "_type": "Diesel Social Links",
+     "title": "Follow Alan Wake 2",
+     "linkHomepage": "http://alanwake.com/",
+     "linkInstagram": "http://instagram.com/alanwakeofficial"
+    },
+    "carousel": {
+     "_type": "Diesel Carousel",
+     "items": [
+      {
+       "image": {
+        "_type": "Diesel Image"
+       },
+       "_type": "Diesel Carousel Item - Image OR Video",
+       "video": {
+        "epicStillDurationSeconds": 2,
+        "recipes": "{\n  \"en-US\": [\n    {\n      \"recipe\": \"video-fmp4\",\n      \"outputs\": [\n        {\n          \"contentType\": \"application/dash+xml\",\n          \"key\": \"manifest\",\n          \"url\": \"https://media-cdn.epicgames.com/0ca6d8b0c2e34303800a135825248e67/0ca6d8b0c2e34303800a135825248e67.mpd\"\n        },\n        {\n          \"contentType\": \"image/png\",\n          \"key\": \"thumbnail\",\n          \"url\": \"https://cdn2.unrealengine.com/egs-alanwake2-remedyentertainment-g1c-00-accolades-1920x1080-3736878f492c.jpg\"\n        }\n      ],\n      \"mediaRefId\": \"4db2bfee742b4d8da6b2835ac2f0c7ca\"\n    },\n    {\n      \"recipe\": \"video-webm\",\n      \"outputs\": [\n        {\n          \"contentType\": \"application/dash+xml\",\n          \"key\": \"manifest\",\n          \"url\": \"https://media-cdn.epicgames.com/cb92081c851b450c8c86e257128d6047/cb92081c851b450c8c86e257128d6047.mpd\"\n        },\n        {\n          \"contentType\": \"image/png\",\n          \"key\": \"thumbnail\",\n          \"url\": \"https://cdn2.unrealengine.com/egs-alanwake2-remedyentertainment-g1c-00-accolades-1920x1080-3736878f492c.jpg\"\n        }\n      ],\n      \"mediaRefId\": \"ea40fd8eba384735a26b75218746dc48\"\n    },\n    {\n      \"recipe\": \"video-hls\",\n      \"outputs\": [\n        {\n          \"contentType\": \"application/x-mpegURL\",\n          \"key\": \"manifest\",\n          \"url\": \"https://media-cdn.epicgames.com/7286954a134143a28fa585f195589268/7286954a134143a28fa585f195589268.m3u8\"\n        },\n        {\n          \"contentType\": \"image/png\",\n          \"key\": \"thumbnail\",\n          \"url\": \"https://cdn2.unrealengine.com/egs-alanwake2-remedyentertainment-g1c-00-accolades-1920x1080-3736878f492c.jpg\"\n        }\n      ],\n      \"mediaRefId\": \"85bea01cf06c474693be772635a38d07\"\n    }\n  ]\n}",
+        "epicStillType": "PREPEND",
+        "loop": true,
+        "_type": "Diesel Video",
+        "hasFullScreen": true,
+        "hasControls": true,
+        "type": "epicHosted",
+        "muted": true,
+        "autoplay": true
+       }
+      },
+      {
+       "image": {
+        "_type": "Diesel Image"
+       },
+       "_type": "Diesel Carousel Item - Image OR Video",
+       "video": {
+        "epicStillDurationSeconds": 2,
+        "recipes": "{\n  \"en-US\": [\n    {\n      \"recipe\": \"video-webm\",\n      \"outputs\": [\n        {\n          \"contentType\": \"application/dash+xml\",\n          \"key\": \"manifest\",\n          \"url\": \"https://media-cdn.epicgames.com/614e7c4ac7d841adb0c3c6b5e93d6cc2/614e7c4ac7d841adb0c3c6b5e93d6cc2.mpd\"\n        },\n        {\n          \"contentType\": \"image/png\",\n          \"key\": \"thumbnail\",\n          \"url\": \"https://cdn2.unrealengine.com/egs-alanwake2-remedyentertainment-g1c-00-launchtrailer-thumbnail-1920x1080-8bee37fca294.jpg\"\n        }\n      ],\n      \"mediaRefId\": \"f394984855714d52a29ce84a8550a855\"\n    },\n    {\n      \"recipe\": \"video-fmp4\",\n      \"outputs\": [\n        {\n          \"contentType\": \"application/dash+xml\",\n          \"key\": \"manifest\",\n          \"url\": \"https://media-cdn.epicgames.com/0b0d08b9ed6748e3ae2e60ea0d8fbf14/0b0d08b9ed6748e3ae2e60ea0d8fbf14.mpd\"\n        },\n        {\n          \"contentType\": \"image/png\",\n          \"key\": \"thumbnail\",\n          \"url\": \"https://cdn2.unrealengine.com/egs-alanwake2-remedyentertainment-g1c-00-launchtrailer-thumbnail-1920x1080-8bee37fca294.jpg\"\n        }\n      ],\n      \"mediaRefId\": \"b7e5624ec67d48f49a939aba650c534d\"\n    },\n    {\n      \"recipe\": \"video-hls\",\n      \"outputs\": [\n        {\n          \"contentType\": \"application/x-mpegURL\",\n          \"key\": \"manifest\",\n          \"url\": \"https://media-cdn.epicgames.com/fc19e8726d0b4a4ab427276828f0c59e/fc19e8726d0b4a4ab427276828f0c59e.m3u8\"\n        },\n        {\n          \"contentType\": \"image/png\",\n          \"key\": \"thumbnail\",\n          \"url\": \"https://cdn2.unrealengine.com/egs-alanwake2-remedyentertainment-g1c-00-launchtrailer-thumbnail-1920x1080-8bee37fca294.jpg\"\n        }\n      ],\n      \"mediaRefId\": \"219bad9c6bb9409b9d3cffcf5f5db414\"\n    }\n  ]\n}",
+        "epicStillType": "PREPEND",
+        "loop": true,
+        "_type": "Diesel Video",
+        "hasFullScreen": true,
+        "hasControls": true,
+        "type": "epicHosted",
+        "muted": true,
+        "autoplay": true
+       }
+      },
+      {
+       "image": {
+        "src": "https://cdn2.unrealengine.com/egs-alanwake2-remedyentertainment-g1a-03-award-1920x1080-9e0de20157f9.jpg",
+        "_type": "Diesel Image"
+       },
+       "_type": "Diesel Carousel Item - Image OR Video",
+       "video": {
+        "loop": false,
+        "_type": "Diesel Video",
+        "hasFullScreen": false,
+        "hasControls": false,
+        "muted": false,
+        "autoplay": false
+       }
+      },
+      {
+       "image": {
+        "src": "https://cdn2.unrealengine.com/egs-alanwake2-remedyentertainment-g1a-02-1920x1080-cee72a709dc4.jpg",
+        "_type": "Diesel Image"
+       },
+       "_type": "Diesel Carousel Item - Image OR Video",
+       "video": {
+        "loop": false,
+        "_type": "Diesel Video",
+        "hasFullScreen": false,
+        "hasControls": false,
+        "muted": false,
+        "autoplay": false
+       }
+      },
+      {
+       "image": {
+        "src": "https://cdn2.unrealengine.com/egs-alanwake2-remedyentertainment-g1a-03-1920x1080-321a6753e674.jpg",
+        "_type": "Diesel Image"
+       },
+       "_type": "Diesel Carousel Item - Image OR Video",
+       "video": {
+        "loop": false,
+        "_type": "Diesel Video",
+        "hasFullScreen": false,
+        "hasControls": false,
+        "muted": false,
+        "autoplay": false
+       }
+      }
+     ]
+    },
+    "gallery": {
+     "_type": "Diesel Gallery"
+    }
+   }
+  },
+  {
+   "type": "offer",
+   "_slug": "deluxe-edition",
+   "productName": "Alan Wake 2",
+   "data": {
+    "_type": "Diesel Product Detail"
+   }
+  }
+ ]
+}

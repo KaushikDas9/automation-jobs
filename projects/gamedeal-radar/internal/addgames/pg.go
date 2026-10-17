@@ -13,6 +13,7 @@ import (
 	"gamedeal-radar/daily-check/internal/run"
 	"gamedeal-radar/daily-check/internal/steam"
 	"gamedeal-radar/daily-check/internal/steamtags"
+	"gamedeal-radar/daily-check/internal/storedetails"
 	"gamedeal-radar/daily-check/internal/storeprices"
 	"gamedeal-radar/daily-check/internal/usd"
 )
@@ -35,7 +36,10 @@ func (q PgQueue) Claim(ctx context.Context, max int, ids []string, dryRun bool) 
 	}
 	out := make([]Request, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, Request{ID: r.ID, SteamAppID: r.SteamAppID, Name: r.Name, GameID: r.GameID, Attempts: r.Attempts})
+		out = append(out, Request{
+			ID: r.ID, StoreCode: r.StoreCode, ExternalID: r.ExternalID, SteamAppID: r.SteamAppID,
+			Name: r.Name, GameID: r.GameID, Attempts: r.Attempts,
+		})
 	}
 	return out, nil
 }
@@ -56,6 +60,12 @@ type TagAPI interface {
 	GetItems(ctx context.Context, appIDs []int) ([]steamtags.StoreItem, error)
 }
 
+// StorePages reads Epic and GOG store pages (storedetails.Client in production).
+type StorePages interface {
+	EpicDetails(ctx context.Context, slug string) (*steam.Details, error)
+	GOGDetails(ctx context.Context, slug, name string) (*steam.Details, error)
+}
+
 // PgSteps runs the real steps with the existing internal packages. The game is not active
 // yet, so the "active games" lists those packages read are replaced by one-game views
 // (oneGame and oneStoreGame) that return only the requested game.
@@ -66,6 +76,7 @@ type PgSteps struct {
 	TagSrc  TagAPI
 	GOGAPI  storeprices.GOGPricer
 	EpicAPI itad.API // nil when ITAD_API_KEY is not set: the Epic step is skipped
+	Pages   StorePages
 	DryRun  bool
 
 	tagNames    map[int]string
@@ -167,6 +178,58 @@ func (s *PgSteps) Details(ctx context.Context, r Request) StepResult {
 		return Failed("details", "database write failed", err)
 	}
 	return OK("details")
+}
+
+// EpicDetails reads the Epic product page of the request's slug and saves it as the game's
+// details. Review columns stay empty (Epic has no review summary).
+func (s *PgSteps) EpicDetails(ctx context.Context, r Request) StepResult {
+	if s.Pages == nil {
+		return Failed("details", "store pages not configured", nil)
+	}
+	d, err := s.Pages.EpicDetails(ctx, r.ExternalID)
+	return s.saveStoreDetails(ctx, r, "epic", d, err)
+}
+
+// GOGDetails reads the GOG product data of the request's slug and saves it as the game's details.
+func (s *PgSteps) GOGDetails(ctx context.Context, r Request) StepResult {
+	if s.Pages == nil {
+		return Failed("details", "store pages not configured", nil)
+	}
+	d, err := s.Pages.GOGDetails(ctx, r.ExternalID, r.Name)
+	return s.saveStoreDetails(ctx, r, "gog", d, err)
+}
+
+func (s *PgSteps) saveStoreDetails(ctx context.Context, r Request, store string, d *steam.Details, err error) StepResult {
+	if err == nil && d == nil {
+		err = errors.New("no details returned")
+	}
+	if err != nil {
+		return Failed("details", storeNote(ctx, store, err), err)
+	}
+	if s.DryRun {
+		return OK("details")
+	}
+	if err := s.Repo.UpsertGameDetails(ctx, r.GameID, d, nil); err != nil {
+		return Failed("details", "database write failed", err)
+	}
+	return OK("details")
+}
+
+// storeNote is a fixed, non-sensitive reason for a failed Epic or GOG page read.
+func storeNote(ctx context.Context, store string, err error) string {
+	switch {
+	case errors.Is(err, storedetails.ErrNotFound):
+		return store + " has no such product"
+	case errors.Is(err, storedetails.ErrInvalidID):
+		return "invalid " + store + " id"
+	case ctx.Err() != nil:
+		return "run cut short"
+	case errors.Is(err, storedetails.ErrBlocked):
+		return store + " refused the request"
+	case storedetails.IsTransient(err):
+		return store + " temporarily unavailable"
+	}
+	return store + " page could not be read"
 }
 
 // INR runs the daily-check path (fetch, snapshot, current price, events, MarkChecked) for
