@@ -51,6 +51,7 @@ type Movie struct {
 // Details is the storefront metadata for one Steam app.
 type Details struct {
 	ExternalAppID      string
+	Type               string // Steam's app type, for example game, dlc, music. Not stored.
 	ShortDescription   string
 	ReleaseDateText    string
 	ReleaseDate        *time.Time
@@ -91,6 +92,7 @@ type rawDetailsEntry struct {
 }
 
 type rawDetails struct {
+	Type               string          `json:"type"`
 	ShortDescription   string          `json:"short_description"`
 	Website            string          `json:"website"`
 	SupportedLanguages string          `json:"supported_languages"`
@@ -173,6 +175,7 @@ func ParseDetails(appID string, body []byte) (*Details, error) {
 
 	d := &Details{
 		ExternalAppID:      appID,
+		Type:               strings.ToLower(strings.TrimSpace(raw.Type)),
 		ShortDescription:   plainText(raw.ShortDescription),
 		Developers:         nonNilStrings(raw.Developers),
 		Publishers:         nonNilStrings(raw.Publishers),

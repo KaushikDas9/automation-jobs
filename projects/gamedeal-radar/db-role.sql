@@ -86,6 +86,18 @@ GRANT SELECT, INSERT, UPDATE ON fx_rates TO gdr_daily_job;
 --     the ON CONFLICT lookup. There is NO DELETE here, on purpose.
 -- GRANT SELECT, INSERT, UPDATE ON epic_free_games TO gdr_daily_job;
 
+-- 11. Requested games (cmd/add-games). Applied by migration 000013 in the GameDealRader
+--     repo, which also creates the game_requests table. The job claims queue rows
+--     (SELECT ... FOR UPDATE SKIP LOCKED, which needs UPDATE) and records their end state.
+--     It activates a game by updating only is_active and updated_at on games. Everything else
+--     it writes (game_details, prices, snapshots, events, game_store_prices, tags) is already
+--     granted in sections 3 to 8. There is NO INSERT or DELETE on game_requests or games:
+--     the API creates the rows, the job cannot create or remove a game.
+--       GRANT SELECT, UPDATE ON game_requests TO gdr_daily_job;
+--       GRANT UPDATE (is_active, updated_at) ON games TO gdr_daily_job;
+GRANT SELECT, UPDATE ON game_requests TO gdr_daily_job;
+GRANT UPDATE (is_active, updated_at) ON games TO gdr_daily_job;
+
 -- Rows use gen_random_uuid() defaults, so no sequence grants are needed.
 
 -- Optional, after reviewing: keep the password out of logs and shell history.

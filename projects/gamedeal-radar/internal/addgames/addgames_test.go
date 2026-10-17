@@ -1,0 +1,299 @@
+package addgames
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"testing"
+
+	"gamedeal-radar/daily-check/internal/steam"
+)
+
+type fakeQueue struct {
+	reqs      []Request
+	claimErr  error
+	finished  map[string][2]string // id -> status, note
+	activated []string
+	actErr    error
+	claimDry  bool
+	claimMax  int
+	claimIDs  []string
+}
+
+func (q *fakeQueue) Claim(_ context.Context, max int, ids []string, dry bool) ([]Request, error) {
+	q.claimMax, q.claimIDs, q.claimDry = max, ids, dry
+	return q.reqs, q.claimErr
+}
+
+func (q *fakeQueue) Finish(_ context.Context, id, status, note string) error {
+	if q.finished == nil {
+		q.finished = map[string][2]string{}
+	}
+	q.finished[id] = [2]string{status, note}
+	return nil
+}
+
+func (q *fakeQueue) Activate(_ context.Context, gameID string) error {
+	if q.actErr != nil {
+		return q.actErr
+	}
+	q.activated = append(q.activated, gameID)
+	return nil
+}
+
+// fakeSteps returns canned results by step name and records the calls.
+type fakeSteps struct {
+	res         map[string]StepResult
+	calls       []string
+	cancelAfter func()
+}
+
+func (f *fakeSteps) do(name string) StepResult {
+	f.calls = append(f.calls, name)
+	if r, ok := f.res[name]; ok {
+		return r
+	}
+	return OK(name)
+}
+func (f *fakeSteps) Details(context.Context, Request) StepResult { return f.do("details") }
+func (f *fakeSteps) INR(context.Context, Request) StepResult     { return f.do("inr") }
+func (f *fakeSteps) USD(context.Context, Request) StepResult     { return f.do("usd") }
+func (f *fakeSteps) Tags(context.Context, Request) StepResult    { return f.do("tags") }
+func (f *fakeSteps) GOG(context.Context, Request) StepResult     { return f.do("gog") }
+func (f *fakeSteps) Epic(context.Context, Request) StepResult {
+	r := f.do("epic")
+	if f.cancelAfter != nil {
+		f.cancelAfter()
+	}
+	return r
+}
+
+func req(id string) Request {
+	return Request{ID: id, SteamAppID: "620", Name: "Game " + id, GameID: "g-" + id}
+}
+
+func TestAllStepsOKActivatesAndDone(t *testing.T) {
+	q := &fakeQueue{reqs: []Request{req("1")}}
+	st := &fakeSteps{}
+	sum, err := Run(context.Background(), q, st, Options{Max: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sum.Claimed != 1 || sum.Done != 1 || sum.Failed != 0 {
+		t.Fatalf("summary = %+v", sum)
+	}
+	if got := q.finished["1"]; got != [2]string{StatusDone, ""} {
+		t.Fatalf("finish = %v", got)
+	}
+	if len(q.activated) != 1 || q.activated[0] != "g-1" {
+		t.Fatalf("activated = %v", q.activated)
+	}
+	if q.claimMax != 10 || q.claimDry {
+		t.Fatalf("claim args max=%d dry=%t", q.claimMax, q.claimDry)
+	}
+}
+
+func TestEmptyQueue(t *testing.T) {
+	q := &fakeQueue{}
+	sum, err := Run(context.Background(), q, &fakeSteps{}, Options{Max: 10})
+	if err != nil || sum.Claimed != 0 || sum.AllFailed() {
+		t.Fatalf("empty queue: %+v %v", sum, err)
+	}
+	if len(q.finished) != 0 {
+		t.Fatal("nothing should be finished")
+	}
+}
+
+func TestClaimErrorIsReturned(t *testing.T) {
+	q := &fakeQueue{claimErr: errors.New("boom")}
+	if _, err := Run(context.Background(), q, &fakeSteps{}, Options{Max: 1}); err == nil {
+		t.Fatal("claim error must be returned")
+	}
+}
+
+func TestOptionalFailuresNeverBlockActivation(t *testing.T) {
+	q := &fakeQueue{reqs: []Request{req("1")}}
+	st := &fakeSteps{res: map[string]StepResult{
+		"usd":  Failed("usd", "fetch or save failed", errors.New("secret https://x?key=abc")),
+		"tags": Skipped("tags", "no tags"),
+		"gog":  Skipped("gog", "no match"),
+		"epic": Skipped("epic", "skipped, no api key"),
+	}}
+	sum, _ := Run(context.Background(), q, st, Options{Max: 10})
+	if sum.Done != 1 || len(q.activated) != 1 {
+		t.Fatalf("optional failures must not block: %+v", sum)
+	}
+	got := q.finished["1"]
+	if got[0] != StatusDone {
+		t.Fatalf("status = %s", got[0])
+	}
+	for _, want := range []string{"usd: failed (fetch or save failed)", "tags: no tags", "gog: no match", "epic: skipped, no api key"} {
+		if !strings.Contains(got[1], want) {
+			t.Errorf("note %q lacks %q", got[1], want)
+		}
+	}
+	if strings.Contains(got[1], "secret") || strings.Contains(got[1], "key=") {
+		t.Errorf("note leaks error text: %q", got[1])
+	}
+}
+
+func TestCoreFailureLeavesGameInactiveAndSkipsOptional(t *testing.T) {
+	for _, core := range []string{"details", "inr"} {
+		q := &fakeQueue{reqs: []Request{req("1")}}
+		st := &fakeSteps{res: map[string]StepResult{
+			core: Failed(core, "steam temporarily unavailable", errors.New("GET https://store.steampowered.com/x: timeout")),
+		}}
+		sum, _ := Run(context.Background(), q, st, Options{Max: 10})
+		if sum.Failed != 1 || !sum.AllFailed() {
+			t.Fatalf("%s: summary %+v", core, sum)
+		}
+		if len(q.activated) != 0 {
+			t.Fatalf("%s: game must stay inactive", core)
+		}
+		got := q.finished["1"]
+		if got[0] != StatusFailed || !strings.Contains(got[1], core+": steam temporarily unavailable") {
+			t.Fatalf("%s: finish = %v", core, got)
+		}
+		if strings.Contains(got[1], "http") {
+			t.Fatalf("note leaks a URL: %q", got[1])
+		}
+		for _, c := range st.calls {
+			if c == "usd" || c == "gog" || c == "tags" || c == "epic" {
+				t.Fatalf("%s: optional step %s ran after a core failure", core, c)
+			}
+		}
+	}
+}
+
+func TestDetailsFailureStillRunsINR(t *testing.T) {
+	q := &fakeQueue{reqs: []Request{req("1")}}
+	st := &fakeSteps{res: map[string]StepResult{"details": Failed("details", "x", errors.New("e"))}}
+	Run(context.Background(), q, st, Options{Max: 1})
+	if len(st.calls) != 2 || st.calls[1] != "inr" {
+		t.Fatalf("calls = %v", st.calls)
+	}
+}
+
+func TestINRSkippedStillActivates(t *testing.T) {
+	q := &fakeQueue{reqs: []Request{req("1")}}
+	st := &fakeSteps{res: map[string]StepResult{"inr": Skipped("inr", "no steam price in India")}}
+	sum, _ := Run(context.Background(), q, st, Options{Max: 1})
+	if sum.Done != 1 || len(q.activated) != 1 {
+		t.Fatalf("a game without an INR price is still activated: %+v", sum)
+	}
+	if !strings.Contains(q.finished["1"][1], "inr: no steam price in India") {
+		t.Fatalf("note = %q", q.finished["1"][1])
+	}
+}
+
+func TestNotFound(t *testing.T) {
+	q := &fakeQueue{reqs: []Request{req("1")}}
+	st := &fakeSteps{res: map[string]StepResult{
+		"details": Failed("details", "steam has no such app", fmt.Errorf("wrapped: %w", steam.ErrNotFound)),
+	}}
+	sum, _ := Run(context.Background(), q, st, Options{Max: 1})
+	if sum.NotFound != 1 || sum.AllFailed() {
+		t.Fatalf("summary %+v", sum)
+	}
+	if got := q.finished["1"]; got[0] != StatusNotFound || got[1] != "steam has no such app" {
+		t.Fatalf("finish = %v", got)
+	}
+	if len(q.activated) != 0 || len(st.calls) != 1 {
+		t.Fatalf("game stays inactive and later steps are skipped: calls=%v", st.calls)
+	}
+}
+
+func TestInvalidAppIDIsNotFoundWithoutFetching(t *testing.T) {
+	r := req("1")
+	r.SteamAppID = "12; DROP"
+	q := &fakeQueue{reqs: []Request{r}}
+	st := &fakeSteps{}
+	sum, _ := Run(context.Background(), q, st, Options{Max: 1})
+	if sum.NotFound != 1 || len(st.calls) != 0 {
+		t.Fatalf("summary %+v calls %v", sum, st.calls)
+	}
+}
+
+func TestActivateFailureIsFailed(t *testing.T) {
+	q := &fakeQueue{reqs: []Request{req("1")}, actErr: errors.New("permission denied for table games")}
+	sum, _ := Run(context.Background(), q, &fakeSteps{}, Options{Max: 1})
+	if sum.Failed != 1 {
+		t.Fatalf("summary %+v", sum)
+	}
+	got := q.finished["1"]
+	if got[0] != StatusFailed || strings.Contains(got[1], "permission") {
+		t.Fatalf("finish = %v", got)
+	}
+}
+
+func TestDryRunWritesNothing(t *testing.T) {
+	q := &fakeQueue{reqs: []Request{req("1"), req("2")}}
+	st := &fakeSteps{}
+	sum, _ := Run(context.Background(), q, st, Options{Max: 10, DryRun: true})
+	if !q.claimDry {
+		t.Fatal("dry run must claim read-only")
+	}
+	if sum.Done != 2 {
+		t.Fatalf("summary %+v", sum)
+	}
+	if len(q.finished) != 0 || len(q.activated) != 0 {
+		t.Fatalf("dry run changed state: finished=%v activated=%v", q.finished, q.activated)
+	}
+}
+
+func TestMixedRunStatusCounts(t *testing.T) {
+	q := &fakeQueue{reqs: []Request{req("1"), req("2"), req("3")}}
+	st := &perGameSteps{fail: map[string]bool{"g-2": true}}
+	sum, _ := Run(context.Background(), q, st, Options{Max: 10})
+	if sum.Done != 2 || sum.Failed != 1 || sum.AllFailed() {
+		t.Fatalf("summary %+v", sum)
+	}
+	if q.finished["2"][0] != StatusFailed || q.finished["3"][0] != StatusDone {
+		t.Fatalf("finished = %v", q.finished)
+	}
+}
+
+type perGameSteps struct{ fail map[string]bool }
+
+func (p *perGameSteps) Details(_ context.Context, r Request) StepResult {
+	if p.fail[r.GameID] {
+		return Failed("details", "steam request failed", errors.New("x"))
+	}
+	return OK("details")
+}
+func (p *perGameSteps) INR(context.Context, Request) StepResult  { return OK("inr") }
+func (p *perGameSteps) USD(context.Context, Request) StepResult  { return OK("usd") }
+func (p *perGameSteps) Tags(context.Context, Request) StepResult { return OK("tags") }
+func (p *perGameSteps) GOG(context.Context, Request) StepResult  { return OK("gog") }
+func (p *perGameSteps) Epic(context.Context, Request) StepResult { return OK("epic") }
+
+func TestCancelledRunMarksRemainingFailedForRetry(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	q := &fakeQueue{reqs: []Request{req("1"), req("2")}}
+	st := &fakeSteps{cancelAfter: cancel}
+	sum, _ := Run(ctx, q, st, Options{Max: 10})
+	if sum.Done != 1 || sum.Failed != 1 {
+		t.Fatalf("summary %+v", sum)
+	}
+	if got := q.finished["2"]; got[0] != StatusFailed || !strings.Contains(got[1], "cut short") {
+		t.Fatalf("unprocessed request must go back to failed: %v", got)
+	}
+	if len(q.finished) != 2 {
+		t.Fatal("every claimed row must be finished, none left in processing")
+	}
+}
+
+func TestNoteIsClipped(t *testing.T) {
+	long := strings.Repeat("x", 500)
+	if got := clip(long); len(got) != maxNote {
+		t.Fatalf("len = %d", len(got))
+	}
+}
+
+func TestStepsLine(t *testing.T) {
+	got := StepsLine([]StepResult{OK("details"), Skipped("epic", "n"), Failed("gog", "n", nil)})
+	if got != "details=ok epic=skipped gog=failed" {
+		t.Fatalf("line = %q", got)
+	}
+}

@@ -1,0 +1,67 @@
+name: GameDeal Radar add requested games
+
+# Processes the queue of games requested in the admin panel (table game_requests). For each
+# request it fetches Steam details, the Steam INR and USD prices, tags, and the GOG and Epic
+# prices, then makes the game active. Requests that Steam does not know end as not_found.
+# Failed requests are tried again after an hour, up to 3 attempts. An empty queue exits
+# in seconds. GitHub cron is UTC only. IST has no DST, so these times never shift.
+#   20 */6 * * *  =  00:20, 06:20, 12:20, 18:20 UTC  =  05:50, 11:50, 17:50, 23:50 IST
+on:
+  schedule:
+    - cron: "20 */6 * * *"
+  workflow_dispatch:
+    # Manual runs default to dry run. Untick dry_run to write data.
+    inputs:
+      dry_run:
+        description: "Fetch data but write nothing and leave the queue unchanged"
+        type: boolean
+        default: true
+      max_games:
+        description: "Max requests to process in this run"
+        type: string
+        required: false
+        default: "10"
+
+permissions:
+  contents: read
+
+# One run at a time, and one pending. A new run never cancels a running one.
+concurrency:
+  group: gamedeal-radar-add-games
+  cancel-in-progress: false
+
+jobs:
+  add-games:
+    name: Add requested games
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: projects/gamedeal-radar
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache-dependency-path: projects/gamedeal-radar/go.sum
+
+      - name: Build and test
+        run: |
+          go vet ./...
+          go test ./...
+
+      - name: Process requested games
+        env:
+          GDR_DATABASE_URL: ${{ secrets.GDR_DATABASE_URL }}
+          # Optional. Without it the Epic step is skipped for every game.
+          ITAD_API_KEY: ${{ secrets.ITAD_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          GDR_SLACK_WEBHOOK_URL: ${{ secrets.GDR_SLACK_WEBHOOK_URL }}
+          # Inputs exist only on workflow_dispatch. On schedule DRY_RUN is '0' (real write)
+          # and MAX_GAMES is '10'.
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true && '1' || '0' }}
+          MAX_GAMES: ${{ github.event_name == 'workflow_dispatch' && inputs.max_games || '10' }}
+        run: go run ./cmd/add-games
