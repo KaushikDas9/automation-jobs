@@ -48,6 +48,13 @@ WHERE game_id IS NOT NULL
      OR (status = 'processing' AND attempts < $3::int AND started_at  < now() - make_interval(secs => $2::float8))
   )
   AND ($4::uuid[] IS NULL OR id = ANY($4::uuid[]))
+  -- A request that was re-queued is superseded by the newer row for the same game. Claiming both
+  -- would break the one-open-request-per-game rule.
+  AND NOT EXISTS (
+        SELECT 1 FROM game_requests newer
+        WHERE newer.steam_app_id = game_requests.steam_app_id
+          AND newer.requested_at > game_requests.requested_at
+  )
 ORDER BY requested_at ASC
 LIMIT $1::int`
 
