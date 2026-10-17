@@ -1,0 +1,401 @@
+{
+ "description": "When the wife of the best-selling writer Alan Wake disappears on their vacation, his search turns up pages from a thriller he doesn’t even remember writing. A Dark Presence stalks the small town of Bright Falls, pushing Wake to the brink of sanity in his fight to unravel the mystery and save his love.\n<br><br>\nPresented in the style of a TV series, Alan Wake features the trademark Remedy storytelling and pulse-pounding action sequences. As players dive deeper and deeper into the mystery, they’ll face overwhelming odds, plot twists, and cliffhangers. It’s only by mastering the Fight With Light combat mechanic that they can stay one step ahead of the darkness that spreads across Bright Falls, in this psychological action thriller.\n<br><br>\nWith the body of an action game and the mind of a psychological thriller, Alan Wake’s intense atmosphere, deep and multi-layered story, moments of sudden horror, and exceptionally tense combat sequences provide players with an entertaining and original gaming experience.\n<br>\n<ul><li>Includes Alan Wake Special Episodes “The Signal” and “The Writer”.</li><li>INTENSE CINEMATIC ACTION – from Remedy, the masters of cinematic action, comes a 3rd person action game filled with overwhelming odds and desperate near escapes</li><li>RAZOR SHARP SUSPENSE – Gripping storytelling at its best, Alan Wake is like a tightly paced thriller TV series, offering endless twists and cliffhangers, and building up to an epic conclusion</li><li>LIGHT IS YOUR WEAPON – Light is your greatest weapon and only protection as darkness takes over everything and everyone, and turns them against you.</li></ul>",
+ "overview": "When the wife of the best-selling writer Alan Wake disappears on their vacation, his search turns up pages from a thriller he doesn’t even remember writing. A Dark Presence stalks the small town of Bright Falls, pushing Wake to the brink of sanity in his fight to unravel the mystery and save his love.\n<br><br>\nPresented in the style of a TV series, Alan Wake features the trademark Remedy storytelling and pulse-pounding action sequences. As players dive deeper and deeper into the mystery, they’ll face overwhelming odds, plot twists, and cliffhangers. It’s only by mastering the Fight With Light combat mechanic that they can stay one step ahead of the darkness that spreads across Bright Falls, in this psychological action thriller.\n<br><br>\nWith the body of an action game and the mind of a psychological thriller, Alan Wake’s intense atmosphere, deep and multi-layered story, moments of sudden horror, and exceptionally tense combat sequences provide players with an entertaining and original gaming experience.\n<br>\n<ul><li>Includes Alan Wake Special Episodes “The Signal” and “The Writer”.</li><li>INTENSE CINEMATIC ACTION – from Remedy, the masters of cinematic action, comes a 3rd person action game filled with overwhelming odds and desperate near escapes</li><li>RAZOR SHARP SUSPENSE – Gripping storytelling at its best, Alan Wake is like a tightly paced thriller TV series, offering endless twists and cliffhangers, and building up to an epic conclusion</li><li>LIGHT IS YOUR WEAPON – Light is your greatest weapon and only protection as darkness takes over everything and everyone, and turns them against you.</li></ul>",
+ "releaseStatus": "default",
+ "_embedded": {
+  "product": {
+   "id": 1207659037,
+   "title": "Alan Wake",
+   "globalReleaseDate": "2012-01-16T00:00:00+01:00",
+   "gogReleaseDate": "2012-05-08T05:58:00+02:00",
+   "category": "GAME",
+   "isAvailableForSale": true,
+   "isVisibleInCatalog": true
+  },
+  "productType": "GAME",
+  "localizations": [
+   {
+    "_embedded": {
+     "language": {
+      "code": "cn",
+      "name": "Chinese Simplified"
+     },
+     "localizationScope": {
+      "type": "text"
+     }
+    }
+   },
+   {
+    "_embedded": {
+     "language": {
+      "code": "de",
+      "name": "German"
+     },
+     "localizationScope": {
+      "type": "audio"
+     }
+    }
+   },
+   {
+    "_embedded": {
+     "language": {
+      "code": "de",
+      "name": "German"
+     },
+     "localizationScope": {
+      "type": "text"
+     }
+    }
+   },
+   {
+    "_embedded": {
+     "language": {
+      "code": "en",
+      "name": "English"
+     },
+     "localizationScope": {
+      "type": "audio"
+     }
+    }
+   },
+   {
+    "_embedded": {
+     "language": {
+      "code": "en",
+      "name": "English"
+     },
+     "localizationScope": {
+      "type": "text"
+     }
+    }
+   },
+   {
+    "_embedded": {
+     "language": {
+      "code": "es",
+      "name": "Spanish"
+     },
+     "localizationScope": {
+      "type": "audio"
+     }
+    }
+   },
+   {
+    "_embedded": {
+     "language": {
+      "code": "es",
+      "name": "Spanish"
+     },
+     "localizationScope": {
+      "type": "text"
+     }
+    }
+   },
+   {
+    "_embedded": {
+     "language": {
+      "code": "fr",
+      "name": "French"
+     },
+     "localizationScope": {
+      "type": "audio"
+     }
+    }
+   },
+   {
+    "_embedded": {
+     "language": {
+      "code": "fr",
+      "name": "French"
+     },
+     "localizationScope": {
+      "type": "text"
+     }
+    }
+   },
+   {
+    "_embedded": {
+     "language": {
+      "code": "it",
+      "name": "Italian"
+     },
+     "localizationScope": {
+      "type": "audio"
+     }
+    }
+   },
+   {
+    "_embedded": {
+     "language": {
+      "code": "it",
+      "name": "Italian"
+     },
+     "localizationScope": {
+      "type": "text"
+     }
+    }
+   },
+   {
+    "_embedded": {
+     "language": {
+      "code": "jp",
+      "name": "Japanese"
+     },
+     "localizationScope": {
+      "type": "audio"
+     }
+    }
+   },
+   {
+    "_embedded": {
+     "language": {
+      "code": "jp",
+      "name": "Japanese"
+     },
+     "localizationScope": {
+      "type": "text"
+     }
+    }
+   },
+   {
+    "_embedded": {
+     "language": {
+      "code": "ko",
+      "name": "Korean"
+     },
+     "localizationScope": {
+      "type": "text"
+     }
+    }
+   },
+   {
+    "_embedded": {
+     "language": {
+      "code": "pl",
+      "name": "Polish"
+     },
+     "localizationScope": {
+      "type": "text"
+     }
+    }
+   },
+   {
+    "_embedded": {
+     "language": {
+      "code": "ru",
+      "name": "Russian"
+     },
+     "localizationScope": {
+      "type": "text"
+     }
+    }
+   }
+  ],
+  "videos": [
+   {
+    "provider": "youtube",
+    "videoId": "9NBdAtkMAps",
+    "thumbnailId": "9NBdAtkMAps",
+    "_links": {
+     "self": {
+      "href": "https://www.youtube.com/embed/9NBdAtkMAps?wmode=opaque&rel=0"
+     },
+     "thumbnail": {
+      "href": "https://img.youtube.com/vi/9NBdAtkMAps/hqdefault.jpg"
+     }
+    }
+   }
+  ],
+  "publishers": [
+   {
+    "name": "Remedy Entertainment",
+    "searchIndex": "remedy-entertainment"
+   }
+  ],
+  "developers": [
+   {
+    "name": "Remedy Entertainment",
+    "searchIndex": "remedy-entertainment"
+   }
+  ],
+  "supportedOperatingSystems": [
+   {
+    "operatingSystem": {
+     "name": "windows",
+     "versions": "Windows"
+    },
+    "systemRequirements": [
+     {
+      "type": "minimum",
+      "description": "Windows XP SP2 Processor: Dual Core 2GHz Intel or 2.8GHz AMD, Memory: 2 GB RAM, Graphics: DirectX 10 compatible with 512MB RAM, DirectX®: 9.0c, Hard Drive: 8 GB HD space, Sound: DirectX 9.0c compatible",
+      "requirements": [
+       {
+        "id": "system",
+        "name": "System:",
+        "description": "Windows 7 or later"
+       },
+       {
+        "id": "processor",
+        "name": "Processor:",
+        "description": "Dual Core 2GHz Intel or 2.8GHz AMD"
+       },
+       {
+        "id": "memory",
+        "name": "Memory:",
+        "description": "2 GB RAM"
+       },
+       {
+        "id": "graphics",
+        "name": "Graphics:",
+        "description": "DirectX 10 compatible with 512MB RAM"
+       },
+       {
+        "id": "directx",
+        "name": "DirectX:",
+        "description": "9.0c"
+       },
+       {
+        "id": "storage",
+        "name": "Storage:",
+        "description": "8 GB"
+       },
+       {
+        "id": "sound",
+        "name": "Sound:",
+        "description": "DirectX 9.0c compatible"
+       }
+      ]
+     },
+     {
+      "type": "recommended",
+      "description": "Windows 7, Processor: Quad Core 2.66GHz Intel or 3.2GHz AMD, Memory: 4 GB RAM, Graphics: DirectX 10 compatible or later with 1GB RAM, DirectX®: 10, Hard Drive: 8 GB HD space, Sound: DirectX 9.0c compatible",
+      "requirements": [
+       {
+        "id": "system",
+        "name": "System:",
+        "description": "Windows 7 or later"
+       },
+       {
+        "id": "processor",
+        "name": "Processor:",
+        "description": "Quad Core 2.66GHz Intel or 3.2GHz AMD"
+       },
+       {
+        "id": "memory",
+        "name": "Memory:",
+        "description": "4 GB RAM"
+       },
+       {
+        "id": "graphics",
+        "name": "Graphics:",
+        "description": "DirectX 10 compatible or later with 1GB RAM"
+       },
+       {
+        "id": "directx",
+        "name": "DirectX:",
+        "description": "10"
+       },
+       {
+        "id": "storage",
+        "name": "Storage:",
+        "description": "8 GB HD space"
+       },
+       {
+        "id": "sound",
+        "name": "Sound:",
+        "description": "DirectX 9.0c compatible"
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "esrbRating": {
+   "category": {
+    "name": "Teen",
+    "id": 17
+   },
+   "contentDescriptors": [
+    {
+     "descriptor": "Violence",
+     "id": 25
+    },
+    {
+     "descriptor": "Blood",
+     "id": 30
+    },
+    {
+     "descriptor": "Language",
+     "id": 44
+    },
+    {
+     "descriptor": "Use of Alcohol and Tobacco",
+     "id": 55
+    }
+   ],
+   "ageRating": 13
+  },
+  "pegiRating": {
+   "ageRating": 16,
+   "contentDescriptors": [
+    {
+     "descriptor": "Violence"
+    }
+   ]
+  },
+  "uskRating": {
+   "ageRating": 16,
+   "category": {
+    "name": "Approved for children aged 16 and above"
+   }
+  },
+  "brRating": {
+   "ageRating": 16,
+   "contentDescriptors": []
+  },
+  "screenshots": [
+   {
+    "_links": {
+     "self": {
+      "href": "https://images.gog-statics.com/74094fc623103b180fd0418a55bc674c542194b204678ef385fee8f802feb89d_{formatter}.jpg",
+      "templated": true,
+      "formatters": [
+       "product_card_screenshot_112",
+       "product_card_screenshot_748",
+       "product_card_screenshot_748_2x",
+       "1600"
+      ]
+     }
+    }
+   },
+   {
+    "_links": {
+     "self": {
+      "href": "https://images.gog-statics.com/6399aa3e8df906bed793f9261d19fbb67dffb7c67b820ec6da6e5b39a9560312_{formatter}.jpg",
+      "templated": true,
+      "formatters": [
+       "product_card_screenshot_112",
+       "product_card_screenshot_748",
+       "product_card_screenshot_748_2x",
+       "1600"
+      ]
+     }
+    }
+   },
+   {
+    "_links": {
+     "self": {
+      "href": "https://images.gog-statics.com/145842c7e1997e3a2efeef362b9b7b7f79fdc59ed8e4dff88c24bfbc0f50c0c8_{formatter}.jpg",
+      "templated": true,
+      "formatters": [
+       "product_card_screenshot_112",
+       "product_card_screenshot_748",
+       "product_card_screenshot_748_2x",
+       "1600"
+      ]
+     }
+    }
+   }
+  ]
+ }
+}

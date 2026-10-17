@@ -1,0 +1,115 @@
+{
+ "productCount": 2,
+ "products": [
+  {
+   "id": "1207659037",
+   "slug": "alan_wake",
+   "title": "Alan Wake",
+   "productType": "game",
+   "releaseDate": "2012.01.16",
+   "developers": [
+    "Remedy Entertainment"
+   ],
+   "publishers": [
+    "Remedy Entertainment"
+   ],
+   "operatingSystems": [
+    "windows"
+   ],
+   "genres": [
+    {
+     "name": "Action",
+     "slug": "action"
+    },
+    {
+     "name": "Adventure",
+     "slug": "adventure"
+    },
+    {
+     "name": "Horror",
+     "slug": "horror"
+    }
+   ],
+   "ratings": [
+    {
+     "name": "pegiRating",
+     "ageRating": "16"
+    },
+    {
+     "name": "esrbRating",
+     "ageRating": "13"
+    },
+    {
+     "name": "uskRating",
+     "ageRating": "16"
+    },
+    {
+     "name": "brRating",
+     "ageRating": "16"
+    }
+   ],
+   "screenshots": [
+    "https://images.gog-statics.com/74094fc623103b180fd0418a55bc674c542194b204678ef385fee8f802feb89d_{formatter}.jpg",
+    "https://images.gog-statics.com/6399aa3e8df906bed793f9261d19fbb67dffb7c67b820ec6da6e5b39a9560312_{formatter}.jpg",
+    "https://images.gog-statics.com/145842c7e1997e3a2efeef362b9b7b7f79fdc59ed8e4dff88c24bfbc0f50c0c8_{formatter}.jpg"
+   ],
+   "storeLink": "https://www.gog.com/en/game/alan_wake",
+   "coverHorizontal": "https://images.gog-statics.com/668c29a416dba4a030547179927b8d8abf3bc473fa642c743f05020480598180.png"
+  },
+  {
+   "id": "1207659038",
+   "slug": "alan_wakes_american_nightmare",
+   "title": "Alan Wake's American Nightmare",
+   "productType": "game",
+   "releaseDate": "2012.05.22",
+   "developers": [
+    "Remedy Entertainment"
+   ],
+   "publishers": [
+    "Remedy Entertainment"
+   ],
+   "operatingSystems": [
+    "windows"
+   ],
+   "genres": [
+    {
+     "name": "Action",
+     "slug": "action"
+    },
+    {
+     "name": "Adventure",
+     "slug": "adventure"
+    },
+    {
+     "name": "Horror",
+     "slug": "horror"
+    }
+   ],
+   "ratings": [
+    {
+     "name": "pegiRating",
+     "ageRating": "18"
+    },
+    {
+     "name": "esrbRating",
+     "ageRating": "13"
+    },
+    {
+     "name": "uskRating",
+     "ageRating": "16"
+    },
+    {
+     "name": "brRating",
+     "ageRating": "12"
+    }
+   ],
+   "screenshots": [
+    "https://images.gog-statics.com/e57ca4f4a94cabdb6a75a4301f07a27130a95af1797b21b1a83b003910191326_{formatter}.jpg",
+    "https://images.gog-statics.com/630a05f4891b0584c93d341075cddf5bcb10c7eb4cdc96c777a53feb82ae5ca9_{formatter}.jpg",
+    "https://images.gog-statics.com/3654290bff014c03e47c27afcb3876eadd9ec61c7f7f7aed324ca589b2ea036a_{formatter}.jpg"
+   ],
+   "storeLink": "https://www.gog.com/en/game/alan_wakes_american_nightmare",
+   "coverHorizontal": "https://images.gog-statics.com/c66af77d0cbbd17a1c2d3bc94229ee155ae9d5bbf68b1f1f381597f181ef2509.png"
+  }
+ ]
+}

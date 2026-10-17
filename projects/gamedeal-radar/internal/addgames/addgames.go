@@ -1,6 +1,7 @@
 // Package addgames processes the queue of admin-requested games. For each claimed request
 // it runs the same steps as the full automation, for that one game, and activates the game
-// when the two core steps (Steam details and the Steam INR price) succeed. The package
+// when the core steps of the request's store succeed: Steam details and the Steam INR price
+// for a Steam request, the store page details for an Epic or GOG request. The package
 // depends only on small interfaces, so the orchestration is tested without a database.
 package addgames
 
@@ -13,6 +14,7 @@ import (
 	"strings"
 
 	"gamedeal-radar/daily-check/internal/steam"
+	"gamedeal-radar/daily-check/internal/storedetails"
 )
 
 // Request statuses written back to the queue.
@@ -22,10 +24,19 @@ const (
 	StatusNotFound = "not_found"
 )
 
+// Store codes a request can come from (stores.code).
+const (
+	StoreSteam = "steam"
+	StoreEpic  = "epic"
+	StoreGOG   = "gog"
+)
+
 // Request is one claimed queue row.
 type Request struct {
 	ID         string
-	SteamAppID string
+	StoreCode  string // steam, epic or gog
+	ExternalID string // the store's own id: Steam app id, Epic slug, GOG slug
+	SteamAppID string // empty for a non-Steam request
 	Name       string
 	GameID     string
 	Attempts   int
@@ -61,7 +72,11 @@ func Failed(name, note string, err error) StepResult {
 // Steps performs the work for one request. In a dry run the implementation fetches and
 // writes nothing.
 type Steps interface {
+	// Details is the Steam details step, EpicDetails and GOGDetails the store page details
+	// of a non-Steam request. All three report under the step name "details".
 	Details(ctx context.Context, r Request) StepResult
+	EpicDetails(ctx context.Context, r Request) StepResult
+	GOGDetails(ctx context.Context, r Request) StepResult
 	INR(ctx context.Context, r Request) StepResult
 	USD(ctx context.Context, r Request) StepResult
 	Tags(ctx context.Context, r Request) StepResult
@@ -142,9 +157,9 @@ func Run(ctx context.Context, q Queue, st Steps, o Options) (Summary, error) {
 		default:
 			sum.Failed++
 		}
-		slog.Info("game request processed", "game", r.Name, "request_id", r.ID, "status", out.Status,
-			"dry_run", o.DryRun, "steps", StepsLine(out.Steps), "note", out.Note)
-		fmt.Printf("request game=%q status=%s steps=[%s]\n", r.Name, out.Status, StepsLine(out.Steps))
+		slog.Info("game request processed", "game", r.Name, "request_id", r.ID, "store", r.StoreCode,
+			"status", out.Status, "dry_run", o.DryRun, "steps", StepsLine(out.Steps), "note", out.Note)
+		fmt.Printf("request game=%q store=%s status=%s steps=[%s]\n", r.Name, r.StoreCode, out.Status, StepsLine(out.Steps))
 
 		if o.DryRun {
 			continue
@@ -160,8 +175,32 @@ func Run(ctx context.Context, q Queue, st Steps, o Options) (Summary, error) {
 }
 
 // Process runs the steps of one request and decides its status. It activates the game
-// (not in a dry run) when both core steps succeeded. It does not write the queue status.
+// (not in a dry run) when the core steps of the request's store succeeded. It does not write
+// the queue status.
 func Process(ctx context.Context, q Queue, st Steps, r Request, dryRun bool) Outcome {
+	switch r.StoreCode {
+	case StoreSteam, "":
+		return processSteam(ctx, q, st, r, dryRun)
+	case StoreEpic:
+		if !storedetails.ValidEpicSlug(r.ExternalID) {
+			return Outcome{Request: r, Status: StatusNotFound, Note: "invalid epic slug"}
+		}
+		// Price checks never block activation: Epic prices also come from the daily
+		// epic-prices job or the admin's manual price.
+		return processStorePage(ctx, q, r, dryRun, st.EpicDetails, "epic has no such product", st.Epic, st.GOG)
+	case StoreGOG:
+		if !storedetails.ValidGOGSlug(r.ExternalID) {
+			return Outcome{Request: r, Status: StatusNotFound, Note: "invalid gog slug"}
+		}
+		return processStorePage(ctx, q, r, dryRun, st.GOGDetails, "gog has no such product", st.GOG, st.Epic)
+	}
+	return Outcome{Request: r, Status: StatusFailed, Note: "store not supported by the job"}
+}
+
+type stepFunc func(context.Context, Request) StepResult
+
+// processSteam is the Steam request: core steps details and INR, optional USD, tags, GOG, Epic.
+func processSteam(ctx context.Context, q Queue, st Steps, r Request, dryRun bool) Outcome {
 	out := Outcome{Request: r}
 	if !appIDPattern.MatchString(r.SteamAppID) {
 		out.Status = StatusNotFound
@@ -172,7 +211,7 @@ func Process(ctx context.Context, q Queue, st Steps, r Request, dryRun bool) Out
 	// Core step a: Steam details. A missing app, or an app that is not a game, ends the request.
 	details := st.Details(ctx, r)
 	out.Steps = append(out.Steps, details)
-	if details.Status == StepFailed && errors.Is(details.Err, steam.ErrNotFound) {
+	if details.Status == StepFailed && isNotFound(details.Err) {
 		out.Status = StatusNotFound
 		out.Note = clip(orElse(details.Note, "steam has no such app"))
 		return out
@@ -182,26 +221,58 @@ func Process(ctx context.Context, q Queue, st Steps, r Request, dryRun bool) Out
 	inr := st.INR(ctx, r)
 	out.Steps = append(out.Steps, inr)
 
-	var coreFailed []string
-	for _, s := range []StepResult{details, inr} {
-		if s.Status == StepFailed {
-			coreFailed = append(coreFailed, s.Name+": "+orElse(s.Note, "failed"))
-		}
-	}
-	if len(coreFailed) > 0 {
+	if failed := coreFailures(details, inr); failed != "" {
 		out.Status = StatusFailed
-		out.Note = clip(strings.Join(coreFailed, "; "))
+		out.Note = failed
 		return out
 	}
 
 	// Optional steps never block activation.
-	for _, step := range []func(context.Context, Request) StepResult{st.USD, st.Tags, st.GOG, st.Epic} {
+	for _, step := range []stepFunc{st.USD, st.Tags, st.GOG, st.Epic} {
 		out.Steps = append(out.Steps, step(ctx, r))
 	}
+	return activate(ctx, q, out, dryRun)
+}
 
+// processStorePage is an Epic or GOG request: the one core step reads the store page into
+// game_details; the price checks are optional. The Steam INR, USD and tags steps do not run,
+// since the request has no Steam app id (a Steam link of the same game is picked up by the
+// daily Steam jobs once the game is active).
+func processStorePage(ctx context.Context, q Queue, r Request, dryRun bool, details stepFunc, notFound string, optional ...stepFunc) Outcome {
+	out := Outcome{Request: r}
+	d := details(ctx, r)
+	out.Steps = append(out.Steps, d)
+	if d.Status == StepFailed && isNotFound(d.Err) {
+		out.Status = StatusNotFound
+		out.Note = clip(orElse(d.Note, notFound))
+		return out
+	}
+	if failed := coreFailures(d); failed != "" {
+		out.Status = StatusFailed
+		out.Note = failed
+		return out
+	}
+	for _, step := range optional {
+		out.Steps = append(out.Steps, step(ctx, r))
+	}
+	return activate(ctx, q, out, dryRun)
+}
+
+func coreFailures(steps ...StepResult) string {
+	var failed []string
+	for _, s := range steps {
+		if s.Status == StepFailed {
+			failed = append(failed, s.Name+": "+orElse(s.Note, "failed"))
+		}
+	}
+	return clip(strings.Join(failed, "; "))
+}
+
+// activate makes the game active (not in a dry run) and marks the outcome done.
+func activate(ctx context.Context, q Queue, out Outcome, dryRun bool) Outcome {
 	if !dryRun {
-		if err := q.Activate(ctx, r.GameID); err != nil {
-			slog.Warn("activating game failed", "game", r.Name, "error", err)
+		if err := q.Activate(ctx, out.Request.GameID); err != nil {
+			slog.Warn("activating game failed", "game", out.Request.Name, "error", err)
 			out.Status = StatusFailed
 			out.Note = "activate: database update failed"
 			return out
@@ -210,6 +281,11 @@ func Process(ctx context.Context, q Queue, st Steps, r Request, dryRun bool) Out
 	out.Status = StatusDone
 	out.Note = clip(optionalNote(out.Steps))
 	return out
+}
+
+// isNotFound reports a store's "no such product" answer (Steam, Epic or GOG).
+func isNotFound(err error) bool {
+	return errors.Is(err, steam.ErrNotFound) || errors.Is(err, storedetails.ErrNotFound)
 }
 
 // optionalNote lists the optional steps that were skipped or failed, for example

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"gamedeal-radar/daily-check/internal/steam"
+	"gamedeal-radar/daily-check/internal/storedetails"
 )
 
 type fakeQueue struct {
@@ -57,10 +58,27 @@ func (f *fakeSteps) do(name string) StepResult {
 	return OK(name)
 }
 func (f *fakeSteps) Details(context.Context, Request) StepResult { return f.do("details") }
-func (f *fakeSteps) INR(context.Context, Request) StepResult     { return f.do("inr") }
-func (f *fakeSteps) USD(context.Context, Request) StepResult     { return f.do("usd") }
-func (f *fakeSteps) Tags(context.Context, Request) StepResult    { return f.do("tags") }
-func (f *fakeSteps) GOG(context.Context, Request) StepResult     { return f.do("gog") }
+
+// EpicDetails and GOGDetails are recorded as "epic-details" and "gog-details"; their canned
+// results default to OK("details"), the name the real steps report.
+func (f *fakeSteps) EpicDetails(context.Context, Request) StepResult {
+	return f.doAs("epic-details", "details")
+}
+func (f *fakeSteps) GOGDetails(context.Context, Request) StepResult {
+	return f.doAs("gog-details", "details")
+}
+
+func (f *fakeSteps) doAs(call, name string) StepResult {
+	f.calls = append(f.calls, call)
+	if r, ok := f.res[call]; ok {
+		return r
+	}
+	return OK(name)
+}
+func (f *fakeSteps) INR(context.Context, Request) StepResult  { return f.do("inr") }
+func (f *fakeSteps) USD(context.Context, Request) StepResult  { return f.do("usd") }
+func (f *fakeSteps) Tags(context.Context, Request) StepResult { return f.do("tags") }
+func (f *fakeSteps) GOG(context.Context, Request) StepResult  { return f.do("gog") }
 func (f *fakeSteps) Epic(context.Context, Request) StepResult {
 	r := f.do("epic")
 	if f.cancelAfter != nil {
@@ -70,7 +88,15 @@ func (f *fakeSteps) Epic(context.Context, Request) StepResult {
 }
 
 func req(id string) Request {
-	return Request{ID: id, SteamAppID: "620", Name: "Game " + id, GameID: "g-" + id}
+	return Request{ID: id, StoreCode: StoreSteam, ExternalID: "620", SteamAppID: "620", Name: "Game " + id, GameID: "g-" + id}
+}
+
+func epicReq(id, slug string) Request {
+	return Request{ID: id, StoreCode: StoreEpic, ExternalID: slug, Name: "Epic " + id, GameID: "g-" + id}
+}
+
+func gogReq(id, slug string) Request {
+	return Request{ID: id, StoreCode: StoreGOG, ExternalID: slug, Name: "GOG " + id, GameID: "g-" + id}
 }
 
 func TestAllStepsOKActivatesAndDone(t *testing.T) {
@@ -262,11 +288,13 @@ func (p *perGameSteps) Details(_ context.Context, r Request) StepResult {
 	}
 	return OK("details")
 }
-func (p *perGameSteps) INR(context.Context, Request) StepResult  { return OK("inr") }
-func (p *perGameSteps) USD(context.Context, Request) StepResult  { return OK("usd") }
-func (p *perGameSteps) Tags(context.Context, Request) StepResult { return OK("tags") }
-func (p *perGameSteps) GOG(context.Context, Request) StepResult  { return OK("gog") }
-func (p *perGameSteps) Epic(context.Context, Request) StepResult { return OK("epic") }
+func (p *perGameSteps) EpicDetails(context.Context, Request) StepResult { return OK("details") }
+func (p *perGameSteps) GOGDetails(context.Context, Request) StepResult  { return OK("details") }
+func (p *perGameSteps) INR(context.Context, Request) StepResult         { return OK("inr") }
+func (p *perGameSteps) USD(context.Context, Request) StepResult         { return OK("usd") }
+func (p *perGameSteps) Tags(context.Context, Request) StepResult        { return OK("tags") }
+func (p *perGameSteps) GOG(context.Context, Request) StepResult         { return OK("gog") }
+func (p *perGameSteps) Epic(context.Context, Request) StepResult        { return OK("epic") }
 
 func TestCancelledRunMarksRemainingFailedForRetry(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -295,5 +323,169 @@ func TestStepsLine(t *testing.T) {
 	got := StepsLine([]StepResult{OK("details"), Skipped("epic", "n"), Failed("gog", "n", nil)})
 	if got != "details=ok epic=skipped gog=failed" {
 		t.Fatalf("line = %q", got)
+	}
+}
+
+func hasCall(calls []string, name string) bool {
+	for _, c := range calls {
+		if c == name {
+			return true
+		}
+	}
+	return false
+}
+
+func TestEpicRequestRunsStorePageThenPrices(t *testing.T) {
+	q := &fakeQueue{reqs: []Request{epicReq("1", "alan-wake-2")}}
+	st := &fakeSteps{res: map[string]StepResult{"epic": Skipped("epic", "skipped, no api key"), "gog": Skipped("gog", "no match")}}
+	sum, _ := Run(context.Background(), q, st, Options{Max: 10})
+	if sum.Done != 1 || len(q.activated) != 1 || q.activated[0] != "g-1" {
+		t.Fatalf("summary %+v activated %v", sum, q.activated)
+	}
+	want := []string{"epic-details", "epic", "gog"}
+	if strings.Join(st.calls, ",") != strings.Join(want, ",") {
+		t.Fatalf("calls = %v, want %v", st.calls, want)
+	}
+	got := q.finished["1"]
+	if got[0] != StatusDone || got[1] != "epic: skipped, no api key; gog: no match" {
+		t.Fatalf("finish = %v", got)
+	}
+}
+
+func TestGOGRequestRunsStorePageThenPrices(t *testing.T) {
+	q := &fakeQueue{reqs: []Request{gogReq("1", "alan_wake")}}
+	st := &fakeSteps{}
+	sum, _ := Run(context.Background(), q, st, Options{Max: 10})
+	if sum.Done != 1 || len(q.activated) != 1 {
+		t.Fatalf("summary %+v", sum)
+	}
+	if strings.Join(st.calls, ",") != "gog-details,gog,epic" {
+		t.Fatalf("calls = %v", st.calls)
+	}
+	if q.finished["1"] != [2]string{StatusDone, ""} {
+		t.Fatalf("finish = %v", q.finished["1"])
+	}
+}
+
+func TestNonSteamRequestsNeverRunSteamSteps(t *testing.T) {
+	for _, r := range []Request{epicReq("1", "alan-wake-2"), gogReq("2", "alan_wake")} {
+		// A Steam app id on the request (the game is on Steam too) changes nothing.
+		r.SteamAppID = "108710"
+		st := &fakeSteps{}
+		out := Process(context.Background(), &fakeQueue{}, st, r, false)
+		if out.Status != StatusDone {
+			t.Fatalf("%s: %+v", r.StoreCode, out)
+		}
+		for _, c := range []string{"details", "inr", "usd", "tags"} {
+			if hasCall(st.calls, c) {
+				t.Fatalf("%s request ran Steam step %s: %v", r.StoreCode, c, st.calls)
+			}
+		}
+	}
+}
+
+func TestStorePageFailureIsFailedAndSkipsPrices(t *testing.T) {
+	for _, r := range []Request{epicReq("1", "alan-wake-2"), gogReq("1", "alan_wake")} {
+		call := r.StoreCode + "-details"
+		q := &fakeQueue{reqs: []Request{r}}
+		st := &fakeSteps{res: map[string]StepResult{
+			call: Failed("details", r.StoreCode+" temporarily unavailable", errors.New("GET https://x: HTTP 503")),
+		}}
+		sum, _ := Run(context.Background(), q, st, Options{Max: 1})
+		if sum.Failed != 1 || len(q.activated) != 0 {
+			t.Fatalf("%s: summary %+v", r.StoreCode, sum)
+		}
+		got := q.finished["1"]
+		if got[0] != StatusFailed || got[1] != "details: "+r.StoreCode+" temporarily unavailable" {
+			t.Fatalf("%s: finish = %v", r.StoreCode, got)
+		}
+		if len(st.calls) != 1 {
+			t.Fatalf("%s: price steps ran after a core failure: %v", r.StoreCode, st.calls)
+		}
+	}
+}
+
+func TestStorePageNotFound(t *testing.T) {
+	for _, r := range []Request{epicReq("1", "no-such-game"), gogReq("1", "no_such_game")} {
+		call := r.StoreCode + "-details"
+		q := &fakeQueue{reqs: []Request{r}}
+		st := &fakeSteps{res: map[string]StepResult{
+			call: Failed("details", r.StoreCode+" has no such product", fmt.Errorf("x: %w", storedetails.ErrNotFound)),
+		}}
+		sum, _ := Run(context.Background(), q, st, Options{Max: 1})
+		if sum.NotFound != 1 || len(q.activated) != 0 || len(st.calls) != 1 {
+			t.Fatalf("%s: summary %+v calls %v", r.StoreCode, sum, st.calls)
+		}
+		if got := q.finished["1"]; got != [2]string{StatusNotFound, r.StoreCode + " has no such product"} {
+			t.Fatalf("%s: finish = %v", r.StoreCode, got)
+		}
+	}
+}
+
+func TestStorePagePriceFailuresNeverBlock(t *testing.T) {
+	q := &fakeQueue{reqs: []Request{epicReq("1", "alan-wake-2")}}
+	st := &fakeSteps{res: map[string]StepResult{
+		"epic": Failed("epic", "blocked by the store", errors.New("api key=abc")),
+		"gog":  Failed("gog", "lookup failed", nil),
+	}}
+	sum, _ := Run(context.Background(), q, st, Options{Max: 1})
+	if sum.Done != 1 || len(q.activated) != 1 {
+		t.Fatalf("summary %+v", sum)
+	}
+	if got := q.finished["1"][1]; got != "epic: failed (blocked by the store); gog: failed (lookup failed)" {
+		t.Fatalf("note = %q", got)
+	}
+}
+
+func TestInvalidStoreIDsAreNotFoundWithoutFetching(t *testing.T) {
+	for _, r := range []Request{
+		epicReq("1", "../admin"), epicReq("2", "Alan-Wake-2"), epicReq("3", "https://evil.example/x"),
+		epicReq("4", strings.Repeat("a", 121)), gogReq("5", "../x"), gogReq("6", "Alan_Wake"), epicReq("7", ""),
+	} {
+		st := &fakeSteps{}
+		out := Process(context.Background(), &fakeQueue{}, st, r, false)
+		if out.Status != StatusNotFound || len(st.calls) != 0 || !strings.HasPrefix(out.Note, "invalid ") {
+			t.Errorf("%s %q: %+v calls %v", r.StoreCode, r.ExternalID, out, st.calls)
+		}
+		if strings.Contains(out.Note, r.ExternalID) && r.ExternalID != "" {
+			t.Errorf("note echoes the id: %q", out.Note)
+		}
+	}
+}
+
+func TestUnknownStoreFails(t *testing.T) {
+	r := req("1")
+	r.StoreCode = "itch"
+	st := &fakeSteps{}
+	out := Process(context.Background(), &fakeQueue{}, st, r, false)
+	if out.Status != StatusFailed || len(st.calls) != 0 {
+		t.Fatalf("%+v %v", out, st.calls)
+	}
+}
+
+func TestEmptyStoreCodeIsSteam(t *testing.T) {
+	r := req("1")
+	r.StoreCode = ""
+	st := &fakeSteps{}
+	out := Process(context.Background(), &fakeQueue{}, st, r, true)
+	if out.Status != StatusDone || !hasCall(st.calls, "inr") {
+		t.Fatalf("%+v %v", out, st.calls)
+	}
+}
+
+func TestStoreRequestDryRunWritesNothing(t *testing.T) {
+	q := &fakeQueue{reqs: []Request{epicReq("1", "alan-wake-2"), gogReq("2", "alan_wake")}}
+	st := &fakeSteps{}
+	sum, _ := Run(context.Background(), q, st, Options{Max: 10, DryRun: true})
+	if !q.claimDry || sum.Done != 2 || len(q.finished) != 0 || len(q.activated) != 0 {
+		t.Fatalf("summary %+v finished %v activated %v", sum, q.finished, q.activated)
+	}
+}
+
+func TestStoreActivateFailureIsFailed(t *testing.T) {
+	q := &fakeQueue{reqs: []Request{epicReq("1", "alan-wake-2")}, actErr: errors.New("permission denied")}
+	sum, _ := Run(context.Background(), q, &fakeSteps{}, Options{Max: 1})
+	if sum.Failed != 1 || q.finished["1"] != [2]string{StatusFailed, "activate: database update failed"} {
+		t.Fatalf("summary %+v finish %v", sum, q.finished["1"])
 	}
 }

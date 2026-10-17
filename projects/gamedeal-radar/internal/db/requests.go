@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"time"
-
-	"github.com/jackc/pgx/v5"
 )
 
 // Statuses of a game_requests row.
@@ -28,7 +26,9 @@ const (
 // GameRequest is one claimed row of the game_requests queue.
 type GameRequest struct {
 	ID         string
-	SteamAppID string
+	StoreCode  string // stores.code of the request's store: steam, epic, gog
+	ExternalID string // the store's own id (Steam app id, Epic slug, GOG slug)
+	SteamAppID string // "" for a non-Steam request
 	Name       string
 	GameID     string
 	Attempts   int // including this claim
@@ -38,24 +38,31 @@ type GameRequest struct {
 // attempt cap and $4 an optional list of request ids (NULL means any). A row is claimable
 // when pending, when failed with attempts left and finished long enough ago, or when stuck
 // in processing for that long (a run that died). SKIP LOCKED keeps two runs apart.
+//
+// Each row comes with its store code and the store's own id. Rows from before migration
+// 000014 filled store_id and external_id (steam, steam_app_id) are read the same way: a NULL
+// external_id falls back to steam_app_id, and the Go side treats a missing store as Steam.
 const claimSQL = `
-SELECT id::text, steam_app_id, name, game_id::text, attempts
-FROM game_requests
-WHERE game_id IS NOT NULL
+SELECT r.id::text, COALESCE(s.code, ''), COALESCE(NULLIF(r.external_id, ''), r.steam_app_id, ''),
+       COALESCE(r.steam_app_id, ''), r.name, r.game_id::text, r.attempts
+FROM game_requests r
+LEFT JOIN stores s ON s.id = r.store_id
+WHERE r.game_id IS NOT NULL
   AND (
-        status = 'pending'
-     OR (status = 'failed'     AND attempts < $3::int AND finished_at < now() - make_interval(secs => $2::float8))
-     OR (status = 'processing' AND attempts < $3::int AND started_at  < now() - make_interval(secs => $2::float8))
+        r.status = 'pending'
+     OR (r.status = 'failed'     AND r.attempts < $3::int AND r.finished_at < now() - make_interval(secs => $2::float8))
+     OR (r.status = 'processing' AND r.attempts < $3::int AND r.started_at  < now() - make_interval(secs => $2::float8))
   )
-  AND ($4::uuid[] IS NULL OR id = ANY($4::uuid[]))
-  -- A request that was re-queued is superseded by the newer row for the same game. Claiming both
-  -- would break the one-open-request-per-game rule.
+  AND ($4::uuid[] IS NULL OR r.id = ANY($4::uuid[]))
+  -- A request that was re-queued is superseded by the newer row for the same store item.
+  -- Claiming both would break the one-open-request-per-item rule.
   AND NOT EXISTS (
         SELECT 1 FROM game_requests newer
-        WHERE newer.steam_app_id = game_requests.steam_app_id
-          AND newer.requested_at > game_requests.requested_at
+        WHERE newer.store_id IS NOT DISTINCT FROM r.store_id
+          AND COALESCE(NULLIF(newer.external_id, ''), newer.steam_app_id) = COALESCE(NULLIF(r.external_id, ''), r.steam_app_id)
+          AND newer.requested_at > r.requested_at
   )
-ORDER BY requested_at ASC
+ORDER BY r.requested_at ASC
 LIMIT $1::int`
 
 const markProcessingSQL = `
@@ -66,7 +73,7 @@ WHERE id = ANY($1::uuid[])`
 
 // ClaimGameRequests claims up to max requests in one short transaction. With dryRun it
 // only reads them: no lock, no status change.
-func ClaimGameRequests(ctx context.Context, conn *pgx.Conn, max int, ids []string, dryRun bool) ([]GameRequest, error) {
+func ClaimGameRequests(ctx context.Context, conn execer, max int, ids []string, dryRun bool) ([]GameRequest, error) {
 	var idArg any
 	if len(ids) > 0 {
 		idArg = ids
@@ -74,7 +81,8 @@ func ClaimGameRequests(ctx context.Context, conn *pgx.Conn, max int, ids []strin
 	secs := int(RequestRetryAfter / time.Second)
 	query := claimSQL
 	if !dryRun {
-		query += "\nFOR UPDATE SKIP LOCKED"
+		// OF r: the stores side of the outer join is only read, never locked.
+		query += "\nFOR UPDATE OF r SKIP LOCKED"
 	}
 
 	tx, err := conn.Begin(ctx)
@@ -90,10 +98,11 @@ func ClaimGameRequests(ctx context.Context, conn *pgx.Conn, max int, ids []strin
 	var out []GameRequest
 	for rows.Next() {
 		var r GameRequest
-		if err := rows.Scan(&r.ID, &r.SteamAppID, &r.Name, &r.GameID, &r.Attempts); err != nil {
+		if err := rows.Scan(&r.ID, &r.StoreCode, &r.ExternalID, &r.SteamAppID, &r.Name, &r.GameID, &r.Attempts); err != nil {
 			rows.Close()
 			return nil, fmt.Errorf("scanning game request: %w", err)
 		}
+		normalizeRequest(&r)
 		out = append(out, r)
 	}
 	rows.Close()
@@ -117,9 +126,25 @@ func ClaimGameRequests(ctx context.Context, conn *pgx.Conn, max int, ids []strin
 	return out, nil
 }
 
+// normalizeRequest fills the Steam fields of a row without a store (older rows): a missing
+// store is Steam, and a Steam request's app id is its external id when steam_app_id is empty.
+func normalizeRequest(r *GameRequest) {
+	if r.StoreCode == "" {
+		r.StoreCode = "steam"
+	}
+	if r.StoreCode == "steam" {
+		if r.SteamAppID == "" {
+			r.SteamAppID = r.ExternalID
+		}
+		if r.ExternalID == "" {
+			r.ExternalID = r.SteamAppID
+		}
+	}
+}
+
 // FinishGameRequest records the end state of a claimed request. note may be empty (NULL).
 // It only touches rows still in processing, so a row another run took over is left alone.
-func FinishGameRequest(ctx context.Context, conn *pgx.Conn, id, status, note string) error {
+func FinishGameRequest(ctx context.Context, conn execer, id, status, note string) error {
 	const q = `
 		UPDATE game_requests
 		SET status = $2, error = NULLIF($3, ''), finished_at = now(), updated_at = now()
@@ -131,7 +156,7 @@ func FinishGameRequest(ctx context.Context, conn *pgx.Conn, id, status, note str
 }
 
 // ActivateGame sets games.is_active. It uses only the UPDATE (is_active, updated_at) grant.
-func ActivateGame(ctx context.Context, conn *pgx.Conn, gameID string) error {
+func ActivateGame(ctx context.Context, conn execer, gameID string) error {
 	const q = `UPDATE games SET is_active = true, updated_at = now() WHERE id = $1::uuid`
 	if _, err := conn.Exec(ctx, q, gameID); err != nil {
 		return fmt.Errorf("activating game: %w", err)
