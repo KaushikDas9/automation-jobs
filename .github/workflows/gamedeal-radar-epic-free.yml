@@ -1,0 +1,105 @@
+name: GameDeal Radar Epic free games
+
+# Stores Epic's current and upcoming free games in epic_free_games. One request per run to
+# Epic's public free games list. Rows are upserted and never deleted.
+# Two schedules, both UTC (GitHub cron is UTC only; IST has no DST, so the times never shift):
+#   05:30 UTC daily          = 11:00 IST, picks up any change made overnight
+#   15:45 UTC on Thursdays   = 21:15 IST, 45 minutes after Epic's usual Thursday 15:00 UTC rotation
+
+on:
+  schedule:
+    - cron: "30 5 * * *"   # daily, 05:30 UTC
+    - cron: "45 15 * * 4"  # Thursdays, 15:45 UTC
+  workflow_dispatch:
+    # Manual runs default to dry run. Untick dry_run to write the games.
+    inputs:
+      dry_run:
+        description: "Fetch the free games but write nothing to the database"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  # Only used by the final-failure step to open a job-failure issue.
+  issues: write
+
+# One run at a time, and one pending. A new run never cancels a running one.
+concurrency:
+  group: gamedeal-radar-epic-free
+  cancel-in-progress: false
+
+jobs:
+  epic-free:
+    name: Epic free games
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: projects/gamedeal-radar
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache-dependency-path: projects/gamedeal-radar/go.sum
+
+      - name: Build and test
+        run: |
+          go vet ./...
+          go test ./...
+
+      - name: Store Epic free games
+        id: epic
+        env:
+          GDR_DATABASE_URL: ${{ secrets.GDR_DATABASE_URL }}
+          # Shared by every project in the repo (one channel). GDR_SLACK_WEBHOOK_URL is
+          # the optional fallback, read only when SLACK_WEBHOOK_URL is empty.
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          GDR_SLACK_WEBHOOK_URL: ${{ secrets.GDR_SLACK_WEBHOOK_URL }}
+          # Inputs exist only on workflow_dispatch. On schedule DRY_RUN is '0' (real write).
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true && '1' || '0' }}
+          # Both schedules are the scheduled run, so each one is the final attempt.
+          FINAL_ATTEMPT: ${{ github.event_name == 'schedule' && '1' || '0' }}
+        # The program writes complete, final_attempt and blocked to GITHUB_OUTPUT, even when it exits 1.
+        run: go run ./cmd/epic-free
+
+      - name: Open issue on failure
+        # Runs only when this job failed on the scheduled run.
+        if: failure() && steps.epic.outputs.final_attempt == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          TITLE="GameDeal Radar: Epic free games update failed"
+          gh label create job-failure --force --color B60205 \
+            --description "GameDeal Radar job failures" >/dev/null 2>&1 || true
+          if gh issue list --state open --label job-failure --limit 200 --json title --jq '.[].title' \
+            | grep -Fxq "$TITLE"; then
+            echo "An open issue with this title already exists. Not creating a duplicate."
+            exit 0
+          fi
+          BODY=$(mktemp)
+          {
+            echo "The scheduled Epic free games update failed. No free games were stored in this run."
+            echo
+            echo "- Run: ${RUN_URL}"
+            echo
+            echo "No secrets are included here. Check the run log for the reason."
+          } > "$BODY"
+          gh issue create --title "$TITLE" --label job-failure --body-file "$BODY" \
+            || echo "Could not create the failure issue. The run log has the details."
+
+      - name: Close failure issue after recovery
+        # Best effort. Closes only the issue with this job's title.
+        if: success() && steps.epic.outputs.complete == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="GameDeal Radar: Epic free games update failed"
+          for n in $(gh issue list --state open --label job-failure --limit 200 --json number,title --jq ".[] | select(.title == \"$TITLE\") | .number"); do
+            gh issue close "$n" --comment "Recovered. The Epic free games were stored successfully." || true
+          done

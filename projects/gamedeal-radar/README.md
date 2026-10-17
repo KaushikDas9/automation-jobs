@@ -374,6 +374,42 @@ Exit codes: 0 stored (or dry run fetched) with 90% coverage, 1 the tag list or g
 not be read, Steam refused, the run was cut short, a write failed, or coverage was below
 90%, 2 configuration error.
 
+## Epic free games job (`cmd/epic-free`)
+
+A daily job stores Epic's current and upcoming free games in `epic_free_games`. The workflow
+is `gamedeal-radar-epic-free.yml`. It runs at 05:30 UTC every day (11:00 IST) and at 15:45 UTC
+on Thursdays (21:15 IST), 45 minutes after Epic's usual Thursday rotation. A manual run
+defaults to dry run.
+
+- **Source.** Epic's public free games list, one request per run:
+  `https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions?locale=en-US&country=IN&allowCountries=IN`.
+  It needs no key and no cookies. The User-Agent is `PriceTrackerJob/1.0 (daily free games job)`,
+  the timeout is 30 seconds, and a `5xx` response is retried once after 10 seconds. Any other
+  failure is not retried.
+- **Which offers.** Only offers with a 0 percent discount are kept. A game that is free now
+  uses the current offer. A game that is free next uses the upcoming offer. An element with
+  no free offer is skipped.
+- **Store link.** `https://store.epicgames.com/en-US/p/<slug>` when a slug is readable
+  (`^[a-z0-9][a-z0-9-]{1,120}$`, not a 32-character hex id). Otherwise an Epic search link for
+  the title.
+- **Image.** The first `https` image in the order `OfferImageWide`, `Thumbnail`,
+  `DieselStoreFrontWide`. Other URLs are not stored.
+- **Price.** The original price, converted from minor units. It is empty when the feed gives
+  no usable price.
+- **Writes.** One transaction, one upsert per `epic_id`. Every column is refreshed and
+  `fetched_at` is set to now. Nothing is deleted, so a game that leaves the list keeps its row.
+- **Safety.** A feed with zero free offers is a failure, so a changed feed never writes.
+  A dry run writes nothing.
+- **No healthcheck.** This job reads no `GDR_HEALTHCHECK_*` variables. Its only Slack
+  message is the success or failure line, and the failure issue opens only on the scheduled
+  run.
+- **Database role.** Needs `SELECT, INSERT, UPDATE` on `epic_free_games`, no `DELETE`. The
+  grant is applied by migration `000012` in the GameDealRader repo, and noted in
+  `db-role.sql` section 10.
+
+Exit codes: 0 stored (or dry run fetched), 1 the feed could not be read, had no free games,
+or the write failed, 2 configuration error.
+
 ## Requested games job (`cmd/add-games`)
 
 Processes the queue of games an admin requested in the GameDeal Radar panel. For each

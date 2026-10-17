@@ -81,7 +81,12 @@ GRANT SELECT, INSERT, UPDATE ON game_store_prices TO gdr_daily_job;
 --    No DELETE, same as above.
 GRANT SELECT, INSERT, UPDATE ON fx_rates TO gdr_daily_job;
 
--- 10. Requested games (cmd/add-games). Applied by migration 000013 in the GameDealRader
+-- 10. Epic free games (cmd/epic-free). The grant is applied by migration 000012 in the
+--     GameDealRader repo, not by this file. Rows are upserted per epic_id, with SELECT for
+--     the ON CONFLICT lookup. There is NO DELETE here, on purpose.
+-- GRANT SELECT, INSERT, UPDATE ON epic_free_games TO gdr_daily_job;
+
+-- 11. Requested games (cmd/add-games). Applied by migration 000013 in the GameDealRader
 --     repo, which also creates the game_requests table. The job claims queue rows
 --     (SELECT ... FOR UPDATE SKIP LOCKED, which needs UPDATE) and records their end state.
 --     It activates a game by updating only is_active and updated_at on games. Everything else
