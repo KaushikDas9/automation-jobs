@@ -373,3 +373,91 @@ Sunday at 05:00 UTC (10:30 IST), with a manual run that defaults to dry run.
 Exit codes: 0 stored (or dry run fetched) with 90% coverage, 1 the tag list or games could
 not be read, Steam refused, the run was cut short, a write failed, or coverage was below
 90%, 2 configuration error.
+
+## Requested games job (`cmd/add-games`)
+
+Processes the queue of games an admin requested in the GameDeal Radar panel. For each
+request the API has already created an inactive `games` row, the Steam
+`game_store_mappings` row, and a `game_requests` queue row. This job fills in the data and
+makes the game active. The workflow is `gamedeal-radar-add-games.yml`.
+
+### Schedule
+
+Every 6 hours at minute 20: cron `20 */6 * * *`, which is 00:20, 06:20, 12:20 and 18:20
+UTC (05:50, 11:50, 17:50 and 23:50 IST). An empty queue prints `no requested games` and exits 0
+within seconds. Only one run is active at a time (concurrency group
+`gamedeal-radar-add-games`).
+
+### Run it manually
+
+Open the Actions tab, choose **GameDeal Radar add requested games**, then **Run workflow**.
+`dry_run` is ticked by default: it fetches everything, prints one line per game, claims
+nothing and writes nothing. Untick `dry_run` to process the queue for real. `max_games` caps
+the requests handled in the run (default 10). To process specific requests from a terminal,
+set `GAME_REQUEST_IDS` to a comma list of request ids.
+
+### Statuses
+
+| Status | Meaning |
+| --- | --- |
+| `pending` | Waiting for the next run. Created by the API. |
+| `processing` | Claimed by a run. `attempts` went up by one and `started_at` is set. |
+| `done` | Both core steps passed and the game is active. `error` is empty, or a short note about optional steps that were skipped or failed (for example `gog: no match; epic: skipped, no api key`). |
+| `not_found` | Steam has no such app, or it is not a game (music, video and so on). The game stays inactive. |
+| `failed` | A core step failed. The game stays inactive and `error` holds a short, non-sensitive reason. A failed request is claimed again after 1 hour, up to 3 attempts. |
+
+A request stuck in `processing` for more than 1 hour (a run that died) is claimed again by the
+same rule. Claiming uses `SELECT ... FOR UPDATE SKIP LOCKED` in a short transaction, so two runs
+never take the same row.
+
+### Steps for each game
+
+| Step | Existing code it reuses | Kind |
+| --- | --- | --- |
+| details | `steam.Client.FetchDetails` and `FetchReviews`, `db.Repo.UpsertGameDetails` (as `cmd/details-check`) | core |
+| inr | `run.Execute` on a one-game view: fetch, snapshot, current price, price events, `MarkChecked` (as `cmd/daily-check`) | core |
+| usd | `usd.Execute` on a one-game view (as the daily USD pass) | optional |
+| tags | `steamtags.Collect` and `db.Repo.SaveTags` (as `cmd/steam-tags`) | optional |
+| gog | `storeprices.RunGOG` on a one-game view (as `cmd/gog-prices`) | optional |
+| epic | `itad.RunEpic` on a one-game view (as `cmd/epic-prices`); skipped when `ITAD_API_KEY` is empty | optional |
+
+The one-game views return only the requested game, active or not, because the game is
+inactive until the end. Manual rows in `game_store_prices` are respected exactly as in the
+GOG and Epic jobs. All Steam calls share one client at no more than 1 request per second,
+with the same timeouts and retries as the other Steam jobs.
+
+A game is activated (`UPDATE games SET is_active = true, updated_at = now()`) only when
+details and INR both succeed. A game that Steam lists without an INR price (for example free
+or unreleased) counts as success for INR and the note says `inr: no steam price in India`. If a
+core step fails, the optional steps are not run; the retry does them.
+
+### Exit codes and notifications
+
+| Code | Meaning |
+| --- | --- |
+| 0 | Queue empty, or at least one request ended `done` or `not_found` |
+| 1 | The database was unreachable, or every claimed request failed |
+| 2 | Configuration error (for example a bad `MAX_GAMES`) |
+
+GITHUB_OUTPUT gets `complete`, `final_attempt`, `blocked`, `coverage_pct` (done or not_found out
+of claimed), `failed_games` and `total_games`. Slack gets one `success` or `failed` line per run
+that claimed games (not for an empty queue or a dry run). The log has one line per game with
+the game name and each step as ok, skipped or failed. No failure issue is opened and no
+healthcheck is pinged by the workflow.
+
+### Environment variables
+
+| Name | Required | Default | Meaning |
+| --- | --- | --- | --- |
+| `GDR_DATABASE_URL` | yes | none | Postgres connection string, from the `gdr_daily_job` role. Never logged. |
+| `MAX_GAMES` | no | `10` | Requests claimed per run, 1 to 50. |
+| `GAME_REQUEST_IDS` | no | none | Comma list of request ids (UUIDs). Only these are claimed. |
+| `DRY_RUN` | no | `0` | `1` or `true` fetches and prints, claims nothing, writes nothing. Manual runs default to `1`. |
+| `ITAD_API_KEY` | no | none | Price provider key for the Epic step. Without it the Epic step is skipped. Never logged. |
+| `GDR_HEALTHCHECK_URL` | no | none | Dead man's switch URL (secret). Not set by the workflow. |
+| `SLACK_WEBHOOK_URL`, `GDR_SLACK_WEBHOOK_URL` | no | none | Slack webhook, as in the other jobs. |
+
+### Database role
+
+See `db-role.sql`, section 10 (migration `000013` in the GameDealRader repo): `SELECT, UPDATE`
+on `game_requests` and `UPDATE (is_active, updated_at)` on `games`.

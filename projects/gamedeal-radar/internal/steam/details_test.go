@@ -646,3 +646,11 @@ func TestParseDetailsMalformedPlatformRequirementsDoNotFailTheGame(t *testing.T)
 		t.Fatalf("malformed platform blocks should be empty, got mac=%q linux=%q", d.MacReqMinHTML, d.LinuxReqMinHTML)
 	}
 }
+
+func TestParseDetailsKeepsAppType(t *testing.T) {
+	body := []byte(`{"620":{"success":true,"data":{"type":" Game ","short_description":"x"}}}`)
+	d, err := ParseDetails("620", body)
+	if err != nil || d.Type != "game" {
+		t.Fatalf("type = %q, err = %v", d.Type, err)
+	}
+}
