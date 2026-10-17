@@ -81,6 +81,11 @@ GRANT SELECT, INSERT, UPDATE ON game_store_prices TO gdr_daily_job;
 --    No DELETE, same as above.
 GRANT SELECT, INSERT, UPDATE ON fx_rates TO gdr_daily_job;
 
+-- 10. Epic free games (cmd/epic-free). The grant is applied by migration 000012 in the
+--     GameDealRader repo, not by this file. Rows are upserted per epic_id, with SELECT for
+--     the ON CONFLICT lookup. There is NO DELETE here, on purpose.
+-- GRANT SELECT, INSERT, UPDATE ON epic_free_games TO gdr_daily_job;
+
 -- Rows use gen_random_uuid() defaults, so no sequence grants are needed.
 
 -- Optional, after reviewing: keep the password out of logs and shell history.
