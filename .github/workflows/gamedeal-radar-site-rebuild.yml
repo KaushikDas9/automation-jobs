@@ -1,0 +1,49 @@
+name: GameDeal Radar site rebuild
+
+# The website is a static export. The featured games on the landing page are chosen when the
+# site is built, so it must be rebuilt to pick up new prices. This workflow calls a Cloudflare
+# Pages deploy hook, which starts a new build of the live branch. The build itself wakes the
+# sleeping API and fails (keeping the previous deployment live) if it cannot get the deals.
+#
+# All times are UTC (GitHub cron is UTC only; IST is UTC+5:30 with no DST):
+#   00:30 UTC (06:00 IST) after Steam daily slot A (starts 18:30 UTC, last attempt 23:30 UTC),
+#                          so the morning shows fresh prices
+#   08:30 UTC (14:00 IST) after Steam daily slot B (starts 06:30 UTC, last attempt 11:30 UTC)
+#                          picks up the earlier attempts of that slot
+#   Thu 16:15 UTC          after the weekly Epic free-games change (job at 15:45 UTC)
+# About 70 builds a month, well inside the Cloudflare Pages free limit of 500.
+
+on:
+  schedule:
+    - cron: "30 0 * * *"
+    - cron: "30 8 * * *"
+    - cron: "15 16 * * 4"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One rebuild request at a time. A new request never cancels a running one.
+concurrency:
+  group: gamedeal-radar-site-rebuild
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    name: Trigger site rebuild
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call the Cloudflare Pages deploy hook
+        env:
+          HOOK_URL: ${{ secrets.CF_PAGES_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK_URL" ]; then
+            echo "::warning::CF_PAGES_DEPLOY_HOOK is not set, so no rebuild was requested."
+            exit 0
+          fi
+          # The hook URL is a secret. Output is discarded so it is never printed.
+          curl --fail --silent --show-error --max-time 30 \
+            --retry 3 --retry-delay 10 --retry-all-errors \
+            -X POST "$HOOK_URL" -o /dev/null
+          echo "Rebuild requested."
